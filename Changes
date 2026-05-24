@@ -8,6 +8,10 @@
  - Visible strategy chain: plain, browser, stealth, cloakbrowser (CDP), proxy,
    callback — escalated in cost/complexity order
  - WWW::Crawl4AI::Result with attempt history, signals, backend and cost_class
+ - Result link accessors: urls (deduped, absolute, fragment-stripped),
+   internal_links, external_links, links — no reaching into raw
+ - deep_crawl: breadth-first crawl following each page's links through the full
+   strategy chain (max_pages / max_depth / same_host / url_filter / on_page)
  - WWW::Crawl4AI::Detect: service detection + content-quality classification
    (js_required / blocked / captcha / thin_html)
  - WWW::Crawl4AI::Error structured error model (transport/api/job/content)
