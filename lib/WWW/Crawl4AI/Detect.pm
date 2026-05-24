@@ -59,11 +59,20 @@ sub signals {
     || ( $html =~ $RE_WALL )
     || ( $title =~ $RE_TITLE );
 
+  # A captcha marker only walls the page when its prompt shows up in the
+  # *rendered* text (markdown). An embedded widget -- a comment-form reCAPTCHA,
+  # a Cloudflare Turnstile login box -- leaves markers only in the HTML/script
+  # markup (class names, script src), not the visible content, so an HTML-only
+  # match on an otherwise content-rich page is NOT a wall. Treat an HTML-only
+  # match as blocking only when the page is also thin (a JS-rendered gate).
+  my $thin    = length($md) < $min;
+  my $captcha = ( $md =~ $RE_CAPTCHA ) || ( $html =~ $RE_CAPTCHA && $thin );
+
   return {
     js_required => ( $md =~ $RE_JS ) ? 1 : 0,
     blocked     => $blocked ? 1 : 0,
-    captcha     => ( $md =~ $RE_CAPTCHA || $html =~ $RE_CAPTCHA ) ? 1 : 0,
-    thin_html   => ( length($md) < $min ) ? 1 : 0,
+    captcha     => $captcha ? 1 : 0,
+    thin_html   => $thin ? 1 : 0,
     http_error  => ( $code >= 500 || $SOFT_FAIL{$code} ) ? 1 : 0,
   };
 }
@@ -77,6 +86,12 @@ C<< min_markdown => N >> to override the thin-content threshold
 
 C<blocked> reflects content fingerprints (Cloudflare / DataDome / "Just a
 moment" bodies) — not HTTP status, which lives on its own C<http_error> axis.
+
+C<captcha> means the page is captcha-I<walled>, not merely that a captcha
+widget exists somewhere: a marker in the rendered markdown counts, but a
+marker found only in the HTML/script markup (an embedded comment-form
+reCAPTCHA, a Turnstile login box) counts only when the page is also thin —
+otherwise a content-rich page with an embedded widget is treated as good.
 
 =cut
 

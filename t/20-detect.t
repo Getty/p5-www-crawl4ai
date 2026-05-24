@@ -52,6 +52,32 @@ subtest 'captcha' => sub {
   is WWW::Crawl4AI::Detect::why_failed($p), 'captcha', 'captcha wins over thin/js';
 };
 
+subtest 'embedded captcha widget on rich page is not a wall' => sub {
+  # A content-rich page (WordPress + reCAPTCHA comment form / Turnstile login)
+  # carries the markers only in HTML markup, never in the rendered markdown.
+  my $p = {
+    success     => 1,
+    status_code => 200,
+    markdown    => ( 'real article body text ' x 60 ),        # well over 500 chars
+    raw_html    => '<div class="g-recaptcha"></div><script src="cf-turnstile"></script>',
+    title       => 'Trùm Excel - LeQuocThai.Com',
+  };
+  ok !WWW::Crawl4AI::Detect::signals($p)->{captcha}, 'html-only marker on rich page: no captcha signal';
+  ok WWW::Crawl4AI::Detect::is_good($p), 'rich page with embedded widget is good';
+  is WWW::Crawl4AI::Detect::why_failed($p), undef, 'no failure reason';
+};
+
+subtest 'html-only captcha marker on a thin page still walls' => sub {
+  # JS-rendered captcha gate: markdown is empty, marker lives in the markup.
+  my $p = {
+    status_code => 200,
+    markdown    => 'loading',
+    raw_html    => '<div class="cf-turnstile"></div>',
+  };
+  ok WWW::Crawl4AI::Detect::signals($p)->{captcha}, 'html marker + thin = captcha signal';
+  is WWW::Crawl4AI::Detect::why_failed($p), 'captcha', 'reason captcha';
+};
+
 subtest 'http soft/hard fail' => sub {
   ok !WWW::Crawl4AI::Detect::is_good( { status_code => 403, markdown => 'x' x 999 } ), '403 not good';
   is WWW::Crawl4AI::Detect::why_failed( { status_code => 403, markdown => 'x' x 999 } ), 'http_403', 'reason http_403';
