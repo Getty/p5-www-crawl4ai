@@ -6,7 +6,6 @@ requires 'JSON::MaybeXS', '1.004000';
 requires 'URI', '1.70';
 requires 'Safe::Isa', '1.000005';
 requires 'Time::HiRes';
-requires 'Module::Runtime', '0.014';
 
 on test => sub {
   requires 'Test::More', '0.98';

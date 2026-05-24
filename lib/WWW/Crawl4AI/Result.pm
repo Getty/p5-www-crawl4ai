@@ -219,8 +219,8 @@ sub urls {
 
 =method urls
 
-The deduplicated, absolute C<http>/C<https> URLs found on the winning page, in
-document order. Relative hrefs are resolved against L</final_url>;
+The deduplicated, absolute C<http>/C<https> URLs found on the winning page,
+internal links first then external. Relative hrefs are resolved against L</final_url>;
 C<javascript:>, C<mailto:>, C<tel:>, C<data:> and bare anchors are dropped. This
 is the list to feed back into a crawl to go deeper.
 

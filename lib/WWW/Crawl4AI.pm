@@ -325,7 +325,7 @@ sub deep_crawl {
   my $on_page    = delete $opts{on_page};     # coderef ($result, $depth)
   my $url_filter = delete $opts{url_filter};  # coderef ($url) -> bool
 
-  my $start_host = lc( eval { URI->new($start)->host } // '' );
+  my $start_host;  # locked onto the host the start URL actually resolved to
   my %seen       = ( $self->_canon_url($start) => 1 );
   my @queue      = ( { url => $start, depth => 0 } );
   my @results;
@@ -335,6 +335,10 @@ sub deep_crawl {
     my $result = $self->crawl( $node->{url}, %opts );
     push @results, $result;
     $on_page->( $result, $node->{depth} ) if $on_page;
+
+    # Take the host from the first crawl's final_url, so a scheme-less start URL
+    # or a redirect to www. doesn't make same_host reject every link.
+    $start_host //= lc( eval { URI->new( $result->final_url // $node->{url} )->host } // '' );
 
     next if $node->{depth} >= $max_depth;
     next unless $result->ok;
@@ -390,8 +394,9 @@ C<#lat/lon> anchors don't count as separate pages. Options:
 
 =back
 
-Any remaining options (C<min_markdown>, C<fallback>, ...) are forwarded to each
-L</crawl>.
+Any remaining options (such as C<min_markdown>) are forwarded to each
+L</crawl>. Note that the strategy chain is fixed per crawler instance — a
+per-call C<fallback> is B<not> honoured here; set it on the constructor.
 
 =cut
 

@@ -422,7 +422,7 @@ sub do_request {
     $res = $self->ua->request($req);
     last if $res->is_success;
     my $code = $res->code;
-    my $transport = $code == 599 || $res->header('Client-Warning') // '' eq 'Internal response';
+    my $transport = $code == 599 || ( ( $res->header('Client-Warning') // '' ) eq 'Internal response' );
     my $retryable = $transport || $self->_retry_status_set->{$code};
     if ( $retryable && $attempt < $max ) {
       my $delay = $self->retry_backoff->[ $attempt - 1 ] // $self->retry_backoff->[-1] // 1;

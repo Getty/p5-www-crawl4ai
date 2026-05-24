@@ -212,4 +212,95 @@ subtest 'deep_crawl same_host => 0 follows off-host links' => sub {
   is $results->[1]->final_url, 'https://ext.test/z', 'external page crawled';
 };
 
+subtest 'deep_crawl url_filter skips matching urls' => sub {
+  my $site = {
+    'https://t.test/'      => [ 'https://t.test/keep', 'https://t.test/login' ],
+    'https://t.test/keep'  => [],
+    'https://t.test/login' => [],
+  };
+  my $results = WWW::Crawl4AI->new( client => Mock::SiteClient->new( site => $site ), fallback => 'plain' )
+    ->deep_crawl( 'https://t.test/', max_depth => 1, url_filter => sub { $_[0] !~ m{/login} } );
+  is_deeply [ sort map { $_->final_url } @$results ],
+    [ 'https://t.test/', 'https://t.test/keep' ],
+    'login filtered out, keep followed';
+};
+
+# A thin/dead child must show up in the results as ok=0, not be silently dropped.
+package Mock::ThinChildClient {
+  sub new { bless {}, shift }
+  sub crawl {
+    my ( $self, $req ) = @_;
+    my $url  = $req->to_crawl_payload->{urls}[0];
+    my $dead = $url =~ m{/dead$};
+    return [ {
+      status_code => 200,
+      url         => $url,
+      final_url   => $url,
+      markdown    => $dead ? 'x' : ( 'good content ' x 60 ),
+      links       => {
+        internal => ( $url eq 'https://t.test/' ? [ { href => 'https://t.test/dead' } ] : [] ),
+        external => [],
+      },
+    } ];
+  }
+  sub health { 1 }
+}
+
+subtest 'deep_crawl surfaces a dead child as ok=0 rather than dropping it' => sub {
+  my $results = WWW::Crawl4AI->new( client => Mock::ThinChildClient->new, fallback => 'plain' )
+    ->deep_crawl( 'https://t.test/', max_depth => 1 );
+  is scalar @$results, 2, 'start + dead child both present';
+  ok $results->[0]->ok,  'start page ok';
+  ok !$results->[1]->ok, 'dead child surfaced as ok=0';
+  is $results->[1]->final_url, 'https://t.test/dead', 'and it is the dead link';
+};
+
+# Start URL apex redirects to www.; links live on the www. host. same_host must
+# take the host from final_url, not the raw start URL, or it drops everything.
+package Mock::RedirectClient {
+  sub new { bless {}, shift }
+  sub crawl {
+    my ( $self, $req ) = @_;
+    my $url   = $req->to_crawl_payload->{urls}[0];
+    my $final = $url eq 'https://t.test/' ? 'https://www.t.test/' : $url;
+    my $links = $final eq 'https://www.t.test/' ? ['https://www.t.test/b'] : [];
+    return [ {
+      status_code => 200,
+      url         => $url,
+      final_url   => $final,
+      markdown    => ( 'good content ' x 60 ),
+      links       => { internal => [ map { { href => $_ } } @$links ], external => [] },
+    } ];
+  }
+  sub health { 1 }
+}
+
+subtest 'deep_crawl locks onto the redirected host so www. links are followed' => sub {
+  my $results = WWW::Crawl4AI->new( client => Mock::RedirectClient->new, fallback => 'plain' )
+    ->deep_crawl( 'https://t.test/', max_depth => 1 );
+  is scalar @$results, 2, 'start + www. child crawled (host taken from final_url)';
+  is $results->[1]->final_url, 'https://www.t.test/b', 'followed the link on the redirected host';
+};
+
+subtest 'callback returning Crawl4AI-structured markdown is normalized to a string' => sub {
+  my $mock = Mock::Client->new( pages => {
+    crawl4ai_plain   => $thin,
+    crawl4ai_browser => $thin,
+    crawl4ai_stealth => $thin,
+  } );
+  my $c = WWW::Crawl4AI->new(
+    client   => $mock,
+    callback => sub {
+      return {
+        status_code => 200,
+        markdown    => { raw_markdown => ( 'rescued content ' x 50 ), fit_markdown => '' },
+      };
+    },
+  );
+  my $r = $c->markdown('https://example.com');
+  ok $r->ok, 'callback rescued the crawl';
+  is $r->backend, 'external_callback', 'callback won';
+  like $r->markdown, qr/rescued content/, 'structured markdown flattened to a string';
+};
+
 done_testing;
