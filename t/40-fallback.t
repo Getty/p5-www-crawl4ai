@@ -128,4 +128,88 @@ subtest 'strategy that throws is recorded, chain continues' => sub {
   ok defined $r->attempts->[0]->error, 'error object captured';
 };
 
+subtest 'markdown accepts positional url + per-call options' => sub {
+  my $mock = Mock::Client->new(
+    pages => { crawl4ai_plain => { status_code => 200, markdown => 'short but enough' } },
+  );
+  my $c = WWW::Crawl4AI->new( client => $mock, fallback => 'plain' );
+  my $r = $c->markdown( 'https://example.com', min_markdown => 5 );   # would be thin at default 500
+  ok $r->ok, 'positional url + min_markdown override honoured';
+};
+
+# URL-aware mock for deep_crawl: returns a good page per URL with configured links.
+package Mock::SiteClient {
+  sub new   { my ( $c, %a ) = @_; bless { site => $a{site}, calls => [] }, $c }
+  sub calls { $_[0]->{calls} }
+  sub crawl {
+    my ( $self, $req, $backend ) = @_;
+    my $url = $req->to_crawl_payload->{urls}[0];
+    push @{ $self->{calls} }, $url;
+    my $links = $self->{site}{$url} || [];
+    return [ {
+      status_code => 200,
+      url         => $url,
+      final_url   => $url,
+      markdown    => ( 'real useful content ' x 40 ),
+      links       => {
+        internal => [ map { { href => $_ } } grep { m{\Ahttps://t\.test} } @$links ],
+        external => [ map { { href => $_ } } grep { !m{\Ahttps://t\.test} } @$links ],
+      },
+    } ];
+  }
+  sub health { 1 }
+}
+
+subtest 'deep_crawl follows links BFS with depth + dedup + same-host' => sub {
+  my $site = {
+    'https://t.test/'  => [ 'https://t.test/b', 'https://t.test/c', 'https://ext.test/z' ],
+    'https://t.test/b' => [ 'https://t.test/d', 'https://t.test/' ],   # back-link deduped
+    'https://t.test/c' => [],
+    'https://t.test/d' => [],
+  };
+  my $c = WWW::Crawl4AI->new( client => Mock::SiteClient->new( site => $site ), fallback => 'plain' );
+
+  my @seen;
+  my $results = $c->deep_crawl(
+    'https://t.test/',
+    max_depth => 2,
+    on_page   => sub { push @seen, [ $_[0]->final_url, $_[1] ] },
+  );
+
+  is scalar @$results, 4, 'A,B,C,D crawled (ext.test dropped by same_host, back-link deduped)';
+  is_deeply [ map { $_->final_url } @$results ],
+    [ 'https://t.test/', 'https://t.test/b', 'https://t.test/c', 'https://t.test/d' ],
+    'BFS visit order';
+  is $seen[0][1], 0, 'start at depth 0';
+  is $seen[3][1], 2, 'D reached at depth 2';
+  ok !( grep { $_->final_url =~ /ext\.test/ } @$results ), 'off-host link not followed';
+};
+
+subtest 'deep_crawl respects max_depth and max_pages' => sub {
+  my $site = {
+    'https://t.test/'  => [ 'https://t.test/b', 'https://t.test/c' ],
+    'https://t.test/b' => [ 'https://t.test/d' ],
+    'https://t.test/c' => [],
+    'https://t.test/d' => [],
+  };
+  my $shallow = WWW::Crawl4AI->new( client => Mock::SiteClient->new( site => $site ), fallback => 'plain' )
+    ->deep_crawl( 'https://t.test/', max_depth => 1 );
+  is scalar @$shallow, 3, 'depth 1: only start + its two children (D not reached)';
+
+  my $capped = WWW::Crawl4AI->new( client => Mock::SiteClient->new( site => $site ), fallback => 'plain' )
+    ->deep_crawl( 'https://t.test/', max_depth => 5, max_pages => 2 );
+  is scalar @$capped, 2, 'max_pages caps the crawl';
+};
+
+subtest 'deep_crawl same_host => 0 follows off-host links' => sub {
+  my $site = {
+    'https://t.test/'   => [ 'https://ext.test/z' ],
+    'https://ext.test/z' => [],
+  };
+  my $results = WWW::Crawl4AI->new( client => Mock::SiteClient->new( site => $site ), fallback => 'plain' )
+    ->deep_crawl( 'https://t.test/', max_depth => 1, same_host => 0 );
+  is scalar @$results, 2, 'off-host followed when same_host disabled';
+  is $results->[1]->final_url, 'https://ext.test/z', 'external page crawled';
+};
+
 done_testing;

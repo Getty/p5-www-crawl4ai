@@ -6,13 +6,40 @@ with 'WWW::Crawl4AI::Strategy';
 
 our $VERSION = '0.001';
 
+=head1 DESCRIPTION
+
+The escalation tier: a stealth crawl routed through Crawl4AI's C<proxy_config>.
+Only enters the chain when the crawler has a C<proxy_url> (proxies usually cost
+money or bandwidth, hence C<cost_class> C<paid>).
+
+=cut
+
 sub name       { 'crawl4ai_proxy' }
+
+=method name
+
+C<crawl4ai_proxy>.
+
+=cut
+
 sub cost_class { 'paid' }
+
+=method cost_class
+
+C<paid>.
+
+=cut
 
 sub applicable {
   my ( $self, $crawler ) = @_;
   return $crawler->proxy_url ? 1 : 0;
 }
+
+=method applicable
+
+True only when C<< $crawler->proxy_url >> is set.
+
+=cut
 
 sub build_request {
   my ( $self, $crawler, $url ) = @_;
@@ -28,23 +55,3 @@ sub build_request {
 }
 
 1;
-
-=head1 DESCRIPTION
-
-The escalation tier: a stealth crawl routed through Crawl4AI's C<proxy_config>.
-Only enters the chain when the crawler has a C<proxy_url> (proxies usually cost
-money or bandwidth, hence C<cost_class> C<paid>).
-
-=method name
-
-C<crawl4ai_proxy>.
-
-=method cost_class
-
-C<paid>.
-
-=method applicable
-
-True only when C<< $crawler->proxy_url >> is set.
-
-=cut

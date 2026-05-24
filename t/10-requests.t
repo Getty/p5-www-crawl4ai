@@ -4,6 +4,7 @@ use warnings;
 use Test::More;
 use Test::Fatal;
 use JSON::MaybeXS;
+use HTTP::Response;
 
 use WWW::Crawl4AI::Request;
 use WWW::Crawl4AI::Client;
@@ -84,6 +85,34 @@ subtest 'Client: hashref payload accepted directly' => sub {
   my $req = $client->crawl_request( { urls => ['https://x'] } );
   my $body = decode_json( $req->content );
   is_deeply $body->{urls}, ['https://x'], 'raw hashref passed through';
+};
+
+subtest 'Client: structured markdown with empty fit_markdown falls through' => sub {
+  # Crawl4AI >= 0.8 returns markdown as an object, and fit_markdown is often an
+  # empty string when no content filter matched — must not win over raw_markdown.
+  my $body = $json->encode(
+    {
+      success => JSON::MaybeXS::true(),
+      results => [
+        {
+          success     => JSON::MaybeXS::true(),
+          url         => 'https://example.com',
+          status_code => 200,
+          html        => '<html>...</html>',
+          markdown    => {
+            raw_markdown            => "# Example Domain\nreal content here\n",
+            markdown_with_citations => "# Example Domain\nwith refs\n",
+            fit_markdown            => '',
+            fit_html                => '',
+          },
+        },
+      ],
+    }
+  );
+  my $res = HTTP::Response->new( 200, 'OK', [ 'Content-Type' => 'application/json' ], $body );
+  my $pages = $client->parse_crawl_response($res);
+  is scalar @$pages, 1, 'one page parsed';
+  like $pages->[0]{markdown}, qr/real content here/, 'raw_markdown used, empty fit_markdown skipped';
 };
 
 done_testing;

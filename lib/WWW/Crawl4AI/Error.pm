@@ -8,22 +8,6 @@ use overload
 
 our $VERSION = '0.001';
 
-has type        => ( is => 'ro', required => 1 );
-has message     => ( is => 'ro', required => 1 );
-has response    => ( is => 'ro' );
-has data        => ( is => 'ro' );
-has status_code => ( is => 'ro' );
-has url         => ( is => 'ro' );
-has backend     => ( is => 'ro' );
-has attempt     => ( is => 'ro' );
-
-sub is_transport { $_[0]->type eq 'transport' }
-sub is_api       { $_[0]->type eq 'api' }
-sub is_job       { $_[0]->type eq 'job' }
-sub is_content   { $_[0]->type eq 'content' }
-
-1;
-
 =head1 SYNOPSIS
 
   die WWW::Crawl4AI::Error->new(
@@ -39,6 +23,17 @@ sub is_content   { $_[0]->type eq 'content' }
       warn "crawl4ai failed (@{[ $e->type ]}): $e" if $e->is_api;
     }
   }
+
+=head1 DESCRIPTION
+
+Structured error thrown by L<WWW::Crawl4AI::Client> and the strategy chain.
+Stringifies to its C<message> so it works as a drop-in replacement for a
+string exception. Carries type, HTTP context, and the responsible backend so
+callers can route on the specific kind of failure.
+
+=cut
+
+has type        => ( is => 'ro', required => 1 );
 
 =attr type
 
@@ -57,33 +52,68 @@ One of C<transport>, C<api>, C<job>, C<content>. Required.
 
 =back
 
+=cut
+
+has message     => ( is => 'ro', required => 1 );
+
 =attr message
 
 Human-readable error string. Required. The object stringifies to this.
+
+=cut
+
+has response    => ( is => 'ro' );
 
 =attr response
 
 The L<HTTP::Response> object, when available.
 
+=cut
+
+has data        => ( is => 'ro' );
+
 =attr data
 
 The decoded JSON payload, when available.
+
+=cut
+
+has status_code => ( is => 'ro' );
 
 =attr status_code
 
 HTTP status code of the Crawl4AI response (0 for pure transport failures).
 
+=cut
+
+has url         => ( is => 'ro' );
+
 =attr url
 
 Target URL, when the error is tied to one.
+
+=cut
+
+has backend     => ( is => 'ro' );
 
 =attr backend
 
 Name of the strategy backend that produced the error, e.g. C<crawl4ai_plain>.
 
+=cut
+
+has attempt     => ( is => 'ro' );
+
 =attr attempt
 
 1-based attempt counter, populated when retry was involved.
+
+=cut
+
+sub is_transport { $_[0]->type eq 'transport' }
+sub is_api       { $_[0]->type eq 'api' }
+sub is_job       { $_[0]->type eq 'job' }
+sub is_content   { $_[0]->type eq 'content' }
 
 =method is_transport
 
@@ -96,3 +126,5 @@ Name of the strategy backend that produced the error, e.g. C<crawl4ai_plain>.
 Boolean accessors, each returns true when L</type> matches.
 
 =cut
+
+1;

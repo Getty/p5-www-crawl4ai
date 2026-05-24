@@ -6,8 +6,29 @@ with 'WWW::Crawl4AI::Strategy';
 
 our $VERSION = '0.001';
 
+=head1 DESCRIPTION
+
+Full browser rendering: drops C<text_mode> and waits for C<networkidle>, so
+script-heavy pages that come back thin or empty from
+L<WWW::Crawl4AI::Strategy::Plain> get a real render.
+
+=cut
+
 sub name       { 'crawl4ai_browser' }
+
+=method name
+
+C<crawl4ai_browser>.
+
+=cut
+
 sub cost_class { 'browser' }
+
+=method cost_class
+
+C<browser>.
+
+=cut
 
 sub build_request {
   my ( $self, $crawler, $url ) = @_;
@@ -19,19 +40,3 @@ sub build_request {
 }
 
 1;
-
-=head1 DESCRIPTION
-
-Full browser rendering: drops C<text_mode> and waits for C<networkidle>, so
-script-heavy pages that come back thin or empty from
-L<WWW::Crawl4AI::Strategy::Plain> get a real render.
-
-=method name
-
-C<crawl4ai_browser>.
-
-=method cost_class
-
-C<browser>.
-
-=cut

@@ -5,6 +5,27 @@ use warnings;
 
 our $VERSION = '0.001';
 
+=head1 SYNOPSIS
+
+  use WWW::Crawl4AI::Detect ();
+
+  my $sig = WWW::Crawl4AI::Detect::signals($page);
+  # { js_required => 0, blocked => 1, captcha => 0, thin_html => 0, http_error => 0 }
+
+  if ( !WWW::Crawl4AI::Detect::is_good($page) ) {
+    my $why = WWW::Crawl4AI::Detect::why_failed($page);  # 'bot_wall_detected'
+  }
+
+  WWW::Crawl4AI::Detect::probe_cloakbrowser('http://localhost:9222');  # 0/1
+
+=head1 DESCRIPTION
+
+The classifier that decides whether a normalized page (as produced by
+L<WWW::Crawl4AI::Client>) is genuinely useful, and the probes that decide which
+backends to put into the strategy chain. Pure functions; nothing is exported.
+
+=cut
+
 # Default: a result needs at least this many markdown characters to count.
 our $MIN_MARKDOWN = 500;
 
@@ -47,6 +68,18 @@ sub signals {
   };
 }
 
+=func signals
+
+Given a normalized page, returns a hashref of boolean signals: C<js_required>,
+C<blocked>, C<captcha>, C<thin_html>, C<http_error>. Accepts
+C<< min_markdown => N >> to override the thin-content threshold
+(C<$WWW::Crawl4AI::Detect::MIN_MARKDOWN>, default 500).
+
+C<blocked> reflects content fingerprints (Cloudflare / DataDome / "Just a
+moment" bodies) — not HTTP status, which lives on its own C<http_error> axis.
+
+=cut
+
 sub is_good {
   my ( $page, %opt ) = @_;
   return 0 unless ref $page eq 'HASH';
@@ -57,6 +90,13 @@ sub is_good {
   return 0 if $sig->{js_required} || $sig->{blocked} || $sig->{captcha} || $sig->{thin_html};
   return 1;
 }
+
+=func is_good
+
+True when the page passed all checks: success not explicitly false, no soft/hard
+HTTP failure, and no negative signal.
+
+=cut
 
 # Most specific reason first.
 sub why_failed {
@@ -71,6 +111,14 @@ sub why_failed {
   return 'thin_content'      if $sig->{thin_html};
   return undef;
 }
+
+=func why_failed
+
+Returns the most specific failure reason as a short token
+(C<captcha>, C<bot_wall_detected>, C<js_required>, C<http_NNN>,
+C<thin_content>) or C<undef> when the page is good.
+
+=cut
 
 #----------------------------------------------------------------------
 # Service detection
@@ -93,57 +141,22 @@ sub probe_cloakbrowser {
   return $res->is_success ? 1 : 0;
 }
 
-sub detect_proxy_env {
-  return $ENV{CRAWL4AI_PROXY_URL} || undef;
-}
-
-1;
-
-=head1 SYNOPSIS
-
-  use WWW::Crawl4AI::Detect ();
-
-  my $sig = WWW::Crawl4AI::Detect::signals($page);
-  # { js_required => 0, blocked => 1, captcha => 0, thin_html => 0, http_error => 0 }
-
-  if ( !WWW::Crawl4AI::Detect::is_good($page) ) {
-    my $why = WWW::Crawl4AI::Detect::why_failed($page);  # 'bot_wall_detected'
-  }
-
-  WWW::Crawl4AI::Detect::probe_cloakbrowser('http://localhost:9222');  # 0/1
-
-=head1 DESCRIPTION
-
-The classifier that decides whether a normalized page (as produced by
-L<WWW::Crawl4AI::Client>) is genuinely useful, and the probes that decide which
-backends to put into the strategy chain. Pure functions; nothing is exported.
-
-=func signals
-
-Given a normalized page, returns a hashref of boolean signals: C<js_required>,
-C<blocked>, C<captcha>, C<thin_html>, C<http_error>. Accepts
-C<< min_markdown => N >> to override the thin-content threshold
-(C<$WWW::Crawl4AI::Detect::MIN_MARKDOWN>, default 500).
-
-=func is_good
-
-True when the page passed all checks: success not explicitly false, no soft/hard
-HTTP failure, and no negative signal.
-
-=func why_failed
-
-Returns the most specific failure reason as a short token
-(C<captcha>, C<bot_wall_detected>, C<js_required>, C<http_NNN>,
-C<thin_content>) or C<undef> when the page is good.
-
 =func probe_cloakbrowser
 
 True if a CloakBrowser CDP endpoint answers C<GET /json/version>. Query params
 on the URL (e.g. C<?fingerprint=...>) are stripped before probing. Pass
 C<< ua => $lwp >> and/or C<< timeout => $secs >> to control the probe.
 
+=cut
+
+sub detect_proxy_env {
+  return $ENV{CRAWL4AI_PROXY_URL} || undef;
+}
+
 =func detect_proxy_env
 
 Returns C<$ENV{CRAWL4AI_PROXY_URL}> or C<undef>.
 
 =cut
+
+1;
