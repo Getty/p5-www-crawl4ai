@@ -8,6 +8,7 @@ use URI ();
 use URI::Escape ();
 use MIME::Base64 ();
 use Safe::Isa;
+use WWW::Crawl4AI::Markdown qw( resolve_markdown_chain );
 use WWW::Crawl4AI::Request ();
 use WWW::Crawl4AI::Error ();
 
@@ -575,13 +576,7 @@ sub _normalize_link {
 # defined one.
 sub _extract_markdown {
   my ( $self, $page ) = @_;
-  my $md = $page->{markdown};
-  return $md unless ref $md eq 'HASH';
-  for my $key (qw( fit_markdown raw_markdown markdown_with_citations markdown )) {
-    my $value = $md->{$key};
-    return $value if defined $value && length $value;
-  }
-  return undef;
+  return resolve_markdown_chain( $page->{markdown} );
 }
 
 #----------------------------------------------------------------------

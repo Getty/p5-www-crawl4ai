@@ -9,12 +9,8 @@ use WWW::Crawl4AI::Result ();
 use WWW::Crawl4AI::Attempt ();
 use WWW::Crawl4AI::Error ();
 use WWW::Crawl4AI::Detect ();
-use WWW::Crawl4AI::Strategy::Plain ();
-use WWW::Crawl4AI::Strategy::Browser ();
-use WWW::Crawl4AI::Strategy::Stealth ();
-use WWW::Crawl4AI::Strategy::CloakBrowser ();
-use WWW::Crawl4AI::Strategy::Proxy ();
-use WWW::Crawl4AI::Strategy::Callback ();
+use WWW::Crawl4AI::StrategyChain ();
+use WWW::Crawl4AI::DeepCrawlIterator ();
 
 our $VERSION = '0.001';
 
@@ -65,15 +61,50 @@ L<WWW::Crawl4AI::Client> directly.
 
 =cut
 
-# Default chain order, cheapest first.
-my @CHAIN_CLASSES = qw(
-  WWW::Crawl4AI::Strategy::Plain
-  WWW::Crawl4AI::Strategy::Browser
-  WWW::Crawl4AI::Strategy::Stealth
-  WWW::Crawl4AI::Strategy::CloakBrowser
-  WWW::Crawl4AI::Strategy::Proxy
-  WWW::Crawl4AI::Strategy::Callback
+has strategy_chain => (
+  is      => 'lazy',
 );
+
+=attr strategy_chain
+
+A L<WWW::Crawl4AI::StrategyChain> object. Holds the strategy registry.
+Override L</_build_strategy_chain> in a subclass to change defaults or
+pre-build a specific chain.
+
+=cut
+
+sub _build_strategy_chain {
+  my ( $self ) = @_;
+  return WWW::Crawl4AI::StrategyChain->new;
+}
+
+# Deprecated: kept for backward compat. Returns the applicable strategy list
+# the same way the old _build_strategies did.
+sub _strategies_for {
+  my ( $self ) = @_;
+  my $fb = $self->fallback;
+  my @all = @{ $self->strategy_chain->strategies };
+
+  if ( ref $fb eq 'ARRAY' ) {
+    my %by_name = map { $_->name => $_ } @all;
+    return [ grep { $_ && $_->applicable($self) } map { $by_name{$_} } @$fb ];
+  }
+  if ( !$fb || $fb eq 'none' || $fb eq 'plain' ) {
+    return [ grep { $_->name eq 'crawl4ai_plain' } @all ];
+  }
+  return $self->strategy_chain->applicable($self);
+}
+
+has strategies => ( is => 'lazy' );
+
+=attr strategies
+
+Arrayref of instantiated, applicable L<WWW::Crawl4AI::Strategy> objects in
+execution order. Lazily built via L</_strategies_for>.
+
+=cut
+
+sub _build_strategies { $_[0]->_strategies_for }
 
 has base_url => (
   is      => 'ro',
@@ -179,30 +210,6 @@ sub _build_client {
   );
 }
 
-has strategies => ( is => 'lazy' );
-
-=attr strategies
-
-Arrayref of instantiated, applicable L<WWW::Crawl4AI::Strategy> objects in
-execution order. Lazily built from L</fallback>.
-
-=cut
-
-sub _build_strategies {
-  my ( $self ) = @_;
-  my @all = map { $_->new } @CHAIN_CLASSES;
-  my $fb  = $self->fallback;
-
-  if ( ref $fb eq 'ARRAY' ) {
-    my %by_name = map { $_->name => $_ } @all;
-    return [ grep { $_ && $_->applicable($self) } map { $by_name{$_} } @$fb ];
-  }
-  if ( !$fb || $fb eq 'none' || $fb eq 'plain' ) {
-    return [ grep { $_->name eq 'crawl4ai_plain' } @all ];
-  }
-  return [ grep { $_->applicable($self) } @all ];
-}
-
 sub _normalize_args {
   my ( $self, @args ) = @_;
   return () unless @args;
@@ -234,6 +241,10 @@ sub _detect_opts {
 # Turn one strategy run — its page, error, and timing — into an Attempt,
 # classifying the page via Detect. Shared with Net::Async::Crawl4AI so the sync
 # and async chains build identical attempt history.
+#
+# Classification is performed by overridable methods. To swap in a different
+# classifier (e.g. Crawl4AI's own quality score), subclass and override
+# classify_signals and classify_why_failed.
 sub _attempt_for {
   my ( $self, $strategy, $page, $err, $elapsed, $detect ) = @_;
   $detect ||= {};
@@ -253,16 +264,43 @@ sub _attempt_for {
     elapsed    => $elapsed,
   ) unless defined $page;
 
-  my $good = WWW::Crawl4AI::Detect::is_good( $page, %$detect );
+  my $signals = $self->classify_signals( $page, %$detect );
+  my $good    = WWW::Crawl4AI::Detect::is_good( $page, %$detect );
   return WWW::Crawl4AI::Attempt->new(
     backend    => $strategy->name,
     cost_class => $strategy->cost_class,
     ok         => $good,
     page       => $page,
-    signals    => WWW::Crawl4AI::Detect::signals( $page, %$detect ),
-    why_failed => ( $good ? undef : WWW::Crawl4AI::Detect::why_failed( $page, %$detect ) ),
+    signals    => $signals,
+    why_failed => ( $good ? undef : $self->classify_why_failed( $page, %$detect ) ),
     elapsed    => $elapsed,
   );
+}
+
+=method classify_signals
+
+Returns the signals hashref for a normalized page. Default calls
+L<WWW::Crawl4AI::Detect/signals>. Override in a subclass to substitute an
+alternative classifier.
+
+=cut
+
+sub classify_signals {
+  my ( $self, $page, %opts ) = @_;
+  return WWW::Crawl4AI::Detect::signals( $page, %opts );
+}
+
+=method classify_why_failed
+
+Returns the most-specific failure token for a page. Default calls
+L<WWW::Crawl4AI::Detect/why_failed>. Override in a subclass to substitute an
+alternative classifier.
+
+=cut
+
+sub classify_why_failed {
+  my ( $self, $page, %opts ) = @_;
+  return WWW::Crawl4AI::Detect::why_failed( $page, %opts );
 }
 
 sub crawl {
@@ -319,42 +357,20 @@ sub deep_crawl {
   my ( $start, %opts ) = $self->_normalize_args(@args);
   croak "deep_crawl needs a url" unless defined $start && length $start;
 
-  my $max_pages  = exists $opts{max_pages}  ? delete $opts{max_pages}  : 25;
-  my $max_depth  = exists $opts{max_depth}  ? delete $opts{max_depth}  : 2;
-  my $same_host  = exists $opts{same_host}  ? delete $opts{same_host}  : 1;
-  my $on_page    = delete $opts{on_page};     # coderef ($result, $depth)
-  my $url_filter = delete $opts{url_filter};  # coderef ($url) -> bool
+  my $iter = WWW::Crawl4AI::DeepCrawlIterator->new(
+    crawler    => $self,
+    start_url  => $start,
+    max_pages  => ( exists $opts{max_pages}  ? delete $opts{max_pages}  : 25 ),
+    max_depth  => ( exists $opts{max_depth}  ? delete $opts{max_depth}  : 2 ),
+    same_host  => ( exists $opts{same_host}  ? delete $opts{same_host}  : 1 ),
+    url_filter => ( delete $opts{url_filter} ),
+    on_page    => ( delete $opts{on_page} ),
+  );
 
-  my $start_host;  # locked onto the host the start URL actually resolved to
-  my %seen       = ( $self->_canon_url($start) => 1 );
-  my @queue      = ( { url => $start, depth => 0 } );
   my @results;
-
-  while ( @queue && @results < $max_pages ) {
-    my $node   = shift @queue;
-    my $result = $self->crawl( $node->{url}, %opts );
-    push @results, $result;
-    $on_page->( $result, $node->{depth} ) if $on_page;
-
-    # Take the host from the first crawl's final_url, so a scheme-less start URL
-    # or a redirect to www. doesn't make same_host reject every link.
-    $start_host //= lc( eval { URI->new( $result->final_url // $node->{url} )->host } // '' );
-
-    next if $node->{depth} >= $max_depth;
-    next unless $result->ok;
-
-    for my $url ( @{ $result->urls } ) {
-      my $canon = $self->_canon_url($url);
-      next if $seen{$canon}++;
-      if ($same_host) {
-        my $host = lc( eval { URI->new($url)->host } // '' );
-        next unless $host eq $start_host;
-      }
-      next if $url_filter && !$url_filter->($url);
-      push @queue, { url => $url, depth => $node->{depth} + 1 };
-    }
+  while ( my $page = $iter->next ) {
+    push @results, $page->[0];
   }
-
   return \@results;
 }
 
