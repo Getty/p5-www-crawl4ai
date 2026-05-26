@@ -15,6 +15,10 @@
    internal_links, external_links, links — no reaching into raw
  - deep_crawl: breadth-first crawl following each page's links through the full
    strategy chain (max_pages / max_depth / same_host / url_filter / on_page)
+ - Single-URL action endpoints on the Client (and delegated from WWW::Crawl4AI):
+   screenshot / pdf (raw bytes), html (preprocessed), execute_js (page +
+   js_result), llm (LLM Q&A), token (JWT) — each with request/parse/convenience
+   flavours like the rest
  - WWW::Crawl4AI::Detect: service detection + content-quality classification
    (js_required / blocked / captcha / thin_html)
  - WWW::Crawl4AI::Error structured error model (transport/api/job/content)

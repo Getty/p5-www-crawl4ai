@@ -444,6 +444,33 @@ True if the Crawl4AI server answers C<GET /health>.
 
 =cut
 
+sub screenshot { my $self = shift; $self->client->screenshot(@_) }
+sub pdf        { my $self = shift; $self->client->pdf(@_) }
+sub html       { my $self = shift; $self->client->html(@_) }
+sub execute_js { my $self = shift; $self->client->execute_js(@_) }
+sub llm        { my $self = shift; $self->client->llm(@_) }
+sub token      { my $self = shift; $self->client->token(@_) }
+
+=method screenshot
+
+=method pdf
+
+=method html
+
+=method execute_js
+
+=method llm
+
+=method token
+
+Single-URL action endpoints, delegated straight to the underlying
+L<WWW::Crawl4AI::Client> (they do B<not> run the strategy chain). C<screenshot>
+and C<pdf> return raw bytes; C<html> the preprocessed HTML; C<execute_js> a
+normalized page with C<js_result>; C<llm> an answer string (needs a server-side
+LLM provider); C<token> a JWT hash. See L<WWW::Crawl4AI::Client> for arguments.
+
+=cut
+
 sub available_backends { [ map { $_->name } @{ $_[0]->strategies } ] }
 
 =method available_backends

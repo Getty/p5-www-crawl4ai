@@ -4,6 +4,8 @@ requires 'HTTP::Message', '6.00';
 requires 'LWP::UserAgent', '6.00';
 requires 'JSON::MaybeXS', '1.004000';
 requires 'URI', '1.70';
+requires 'URI::Escape';
+requires 'MIME::Base64';
 requires 'Safe::Isa', '1.000005';
 requires 'Time::HiRes';
 

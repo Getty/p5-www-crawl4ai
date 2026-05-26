@@ -5,6 +5,8 @@ use Carp qw( croak );
 use HTTP::Request ();
 use JSON::MaybeXS ();
 use URI ();
+use URI::Escape ();
+use MIME::Base64 ();
 use Safe::Isa;
 use WWW::Crawl4AI::Request ();
 use WWW::Crawl4AI::Error ();
@@ -31,6 +33,10 @@ A thin, UA-agnostic wrapper over the Crawl4AI Docker REST API (default port
   foo_request(...)          → builds an HTTP::Request (no I/O)
   parse_foo_response($res)  → decodes/normalizes (no I/O)
   foo(...)                  → convenience: build + fire (LWP, with retry) + parse
+
+Covered endpoints: C<crawl> (C</crawl>), C<md> (C</md>), C<job_submit> /
+C<job_status> (C</crawl/job>), C<health>, plus the single-URL action endpoints
+C<screenshot>, C<pdf>, C<html>, C<execute_js>, C<llm> and C<token>.
 
 Page results are normalized to a flat hash (C<url>, C<final_url>,
 C<status_code>, C<markdown>, C<html>, C<title>, C<metadata>, C<error>, C<raw>)
@@ -229,6 +235,84 @@ sub job_status_request {
 
 sub health_request { $_[0]->_request( GET => '/health' ) }
 
+sub screenshot_request {
+  my ( $self, $url, %opts ) = @_;
+  croak "screenshot_request needs a url" unless defined $url && length $url;
+  my %body = ( url => $url );
+  $body{screenshot_wait_for} = $opts{wait_for}    if defined $opts{wait_for};
+  $body{output_path}         = $opts{output_path} if defined $opts{output_path};
+  $body{wait_for_images} =
+    $opts{wait_for_images} ? WWW::Crawl4AI::Request::JSON_true() : WWW::Crawl4AI::Request::JSON_false()
+    if exists $opts{wait_for_images};
+  return $self->_request( POST => '/screenshot', \%body );
+}
+
+=method screenshot_request
+
+=method pdf_request
+
+=method html_request
+
+=method execute_js_request
+
+=method llm_request
+
+=method token_request
+
+Build the L<HTTP::Request> for each of the single-URL action endpoints without
+performing I/O. C<screenshot_request> accepts C<wait_for> (seconds),
+C<wait_for_images> (bool) and C<output_path>; C<pdf_request> accepts
+C<output_path>; C<execute_js_request> takes a script string or arrayref;
+C<llm_request> takes a query plus optional C<provider>/C<temperature>/C<base_url>.
+
+=cut
+
+sub pdf_request {
+  my ( $self, $url, %opts ) = @_;
+  croak "pdf_request needs a url" unless defined $url && length $url;
+  my %body = ( url => $url );
+  $body{output_path} = $opts{output_path} if defined $opts{output_path};
+  return $self->_request( POST => '/pdf', \%body );
+}
+
+sub html_request {
+  my ( $self, $url ) = @_;
+  croak "html_request needs a url" unless defined $url && length $url;
+  return $self->_request( POST => '/html', { url => $url } );
+}
+
+sub execute_js_request {
+  my ( $self, $url, $scripts ) = @_;
+  croak "execute_js_request needs a url" unless defined $url && length $url;
+  $scripts = [$scripts] unless ref $scripts eq 'ARRAY';
+  croak "execute_js_request needs at least one script" unless @$scripts && defined $scripts->[0];
+  return $self->_request( POST => '/execute_js', { url => $url, scripts => $scripts } );
+}
+
+sub llm_request {
+  my ( $self, $url, $query, %opts ) = @_;
+  croak "llm_request needs a url"   unless defined $url   && length $url;
+  croak "llm_request needs a query" unless defined $query && length $query;
+  # The page URL is a path segment ({url:path}); escape it so its own scheme and
+  # query string don't merge into ours. The question and tuning go in the query.
+  my $path = URI->new( '/llm/' . URI::Escape::uri_escape_utf8($url) );
+  $path->query_form(
+    q => $query,
+    ( defined $opts{provider}    ? ( provider    => $opts{provider} )    : () ),
+    ( defined $opts{temperature} ? ( temperature => $opts{temperature} ) : () ),
+    ( defined $opts{base_url}    ? ( base_url     => $opts{base_url} )    : () ),
+  );
+  return $self->_request( GET => $path->as_string );
+}
+
+sub token_request {
+  my ( $self, $email, %opts ) = @_;
+  croak "token_request needs an email" unless defined $email && length $email;
+  my %body = ( email => $email );
+  $body{api_token} = $opts{api_token} if defined $opts{api_token};
+  return $self->_request( POST => '/token', \%body );
+}
+
 sub _payload {
   my ( $self, $request, $method ) = @_;
   return $request->$method if $request->$_isa('WWW::Crawl4AI::Request');
@@ -323,6 +407,97 @@ sub parse_health_response {
   return $data if ref $data;
   return 1;
 }
+
+sub parse_screenshot_response {
+  my ( $self, $res, $backend ) = @_;
+  return $self->_decode_b64_artifact( $self->_decode( $res, $backend ), 'screenshot', $backend );
+}
+
+=method parse_screenshot_response
+
+=method parse_pdf_response
+
+Decode the C<{ success, screenshot|pdf }> response and return the B<raw bytes>
+(the base64 payload decoded), ready to write to a file. Throw a C<type=content>
+L<WWW::Crawl4AI::Error> when the server reports failure or returns no artifact.
+
+=cut
+
+sub parse_pdf_response {
+  my ( $self, $res, $backend ) = @_;
+  return $self->_decode_b64_artifact( $self->_decode( $res, $backend ), 'pdf', $backend );
+}
+
+# /screenshot and /pdf return { success => bool, <key> => base64 }. Decode to raw
+# bytes; raise a content error if the server reported nothing usable.
+sub _decode_b64_artifact {
+  my ( $self, $data, $key, $backend ) = @_;
+  my $b64 = ref $data eq 'HASH' ? $data->{$key} : undef;
+  unless ( defined $b64 && length $b64 ) {
+    die WWW::Crawl4AI::Error->new(
+      type    => 'content',
+      message => "Crawl4AI returned no $key",
+      data    => $data,
+      backend => $backend,
+    );
+  }
+  return MIME::Base64::decode_base64($b64);
+}
+
+sub parse_html_response {
+  my ( $self, $res, $backend ) = @_;
+  my $data = $self->_decode( $res, $backend );
+  return ref $data eq 'HASH' ? $data->{html} : $data;
+}
+
+=method parse_html_response
+
+Decode the C<{ html, url, success }> response and return the preprocessed HTML
+string.
+
+=cut
+
+sub parse_execute_js_response {
+  my ( $self, $res, $backend ) = @_;
+  my $data = $self->_decode( $res, $backend );
+  # /execute_js returns a single crawl result (same shape as one /crawl page)
+  # with the script output added under js_execution_result.
+  my $page = $self->_normalize_page( ref $data eq 'HASH' ? $data : { raw => $data } );
+  $page->{js_result} = ref $data eq 'HASH' ? $data->{js_execution_result} : undef;
+  return $page;
+}
+
+=method parse_execute_js_response
+
+Decode the C</execute_js> response into a normalized page (the same shape
+L</parse_crawl_response> produces) with the script return values added under
+C<js_result>.
+
+=cut
+
+sub parse_llm_response {
+  my ( $self, $res, $backend ) = @_;
+  my $data = $self->_decode( $res, $backend );
+  return ref $data eq 'HASH' ? ( $data->{answer} // $data->{result} // $data ) : $data;
+}
+
+=method parse_llm_response
+
+Decode the C</llm> response and return the answer text (the C<answer> field
+when present).
+
+=cut
+
+sub parse_token_response {
+  my ( $self, $res, $backend ) = @_;
+  return $self->_decode( $res, $backend );
+}
+
+=method parse_token_response
+
+Decode the C</token> response into C<< { email, access_token, token_type } >>.
+
+=cut
 
 # Crawl4AI has returned the page list in several shapes across versions;
 # accept all of them rather than pin to one.
@@ -502,6 +677,81 @@ sub health {
   my $res = eval { $self->do_request( $self->health_request ) };
   return 0 if $@ || !$res;
   return $self->parse_health_response($res) ? 1 : 0;
+}
+
+sub screenshot {
+  my ( $self, $url, %opts ) = @_;
+  return $self->parse_screenshot_response( $self->do_request( $self->screenshot_request( $url, %opts ) ) );
+}
+
+=method screenshot
+
+  my $png = $client->screenshot( $url, wait_for => 2, wait_for_images => 1 );
+  open my $fh, '>:raw', 'shot.png'; print $fh $png;
+
+=method pdf
+
+  my $pdf = $client->pdf($url);
+
+C<POST /screenshot> and C<POST /pdf>: render the page and return the raw image
+or PDF B<bytes> (decoded from the base64 the server sends).
+
+=method html
+
+  my $html = $client->html($url);
+
+C<POST /html>: the server-preprocessed (sanitized) HTML as a string.
+
+=method execute_js
+
+  my $page = $client->execute_js( $url, 'return document.title' );
+  my $page = $client->execute_js( $url, [ 'window.scrollTo(0,9e9)', 'return document.title' ] );
+  print $page->{js_result}{results}[0];
+
+C<POST /execute_js>: run one or more JS snippets in the page and return a
+normalized page (as L</crawl>) with the raw script output under C<js_result>
+(C<< { results => [ ... ], success => bool } >>).
+
+=method llm
+
+  my $answer = $client->llm( $url, 'Who is the author?' );
+
+C<GET /llm/{url}>: ask an LLM a question about the page. Requires the Crawl4AI
+server to have an LLM provider configured (e.g. C<OPENAI_API_KEY>); optional
+C<provider>, C<temperature> and C<base_url> are forwarded.
+
+=method token
+
+  my $tok = $client->token('me@example.com');   # { access_token, token_type, ... }
+
+C<POST /token>: obtain a JWT from a server with auth enabled. Feed
+C<< $tok->{access_token} >> back as L</api_token>.
+
+=cut
+
+sub pdf {
+  my ( $self, $url, %opts ) = @_;
+  return $self->parse_pdf_response( $self->do_request( $self->pdf_request( $url, %opts ) ) );
+}
+
+sub html {
+  my ( $self, $url ) = @_;
+  return $self->parse_html_response( $self->do_request( $self->html_request($url) ) );
+}
+
+sub execute_js {
+  my ( $self, $url, $scripts ) = @_;
+  return $self->parse_execute_js_response( $self->do_request( $self->execute_js_request( $url, $scripts ) ) );
+}
+
+sub llm {
+  my ( $self, $url, $query, %opts ) = @_;
+  return $self->parse_llm_response( $self->do_request( $self->llm_request( $url, $query, %opts ) ) );
+}
+
+sub token {
+  my ( $self, $email, %opts ) = @_;
+  return $self->parse_token_response( $self->do_request( $self->token_request( $email, %opts ) ) );
 }
 
 =seealso
