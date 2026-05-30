@@ -1,4 +1,4 @@
-{{$NEXT}}
+0.002     2026-05-30 22:57:39Z
 
  - Result: expose response_headers (lowercased keys) from the origin HTTP fetch,
    round-trips through to_hash/from_hash JSON persistence; empty hash default
