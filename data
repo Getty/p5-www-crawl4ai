@@ -1,0 +1,42 @@
+---
+class: standard
+completed: 2026-05-30
+created: 2026-05-30T22:14:41Z
+id: 1
+priority: high
+status: done
+tags:
+- geo
+- headers
+- goldmine-blocker
+title: Expose response_headers on crawl Result (lowercased keys)
+updated: 2026-05-30T22:14:41Z
+---
+
+WHY
+Goldmine GEO audit needs the origin HTTP response headers from the page Crawl4AI actually fetched (redirects resolved, post bot-wall) to read:
+- Link: (RFC 8288 service discovery -- rel=api-catalog / mcp-server-card / describedby / service-doc)
+- x-robots-tag, content-type
+
+Crawl4AI raw page JSON already carries response_headers (dict in the CrawlResult model -- VERIFY field name against running version). _normalize_page currently drops it; Result has no header attr. A separate plain http_get from the consumer would hit a different response than the browser/stealth crawl, so this belongs in the lib.
+
+SCOPE -- 3 surgical edits, all lib/WWW/Crawl4AI. Net::Async::Crawl4AI inherits for free (crawl_once -> parse_crawl_response -> _normalize_page, Result via the same from_attempt).
+
+1) Client.pm _normalize_page (~line 521): add to returned hash
+     response_headers => _lc_headers( $page->{response_headers} ),
+   new helper (lowercase keys = deterministic matching, mirrors LWP-side consumers):
+     sub _lc_headers { my ($h)=@_; return {} unless ref $h eq q(HASH); return { map { lc($_) => $h->{$_} } keys %$h }; }
+
+2) Result.pm: add attr near links:
+     has response_headers => ( is => q(ro), default => sub { {} } );
+   + =attr POD (dict, lowercased keys, empty hash on failed/headerless crawl).
+
+3) Result.pm from_attempt: add
+     response_headers => $page->{response_headers} // {},
+   AND add response_headers to to_hash so it round-trips through Goldmine run_artifact JSON persistence (to_hash/from_hash).
+
+TEST (Rule 9 -- encode WHY)
+Feed a fixture page hash with response_headers => { Link => q(</.well-known/api-catalog>; rel="api-catalog"), q(X-Robots-Tag) => q(noindex) } through _normalize_page + from_attempt. Assert $result->response_headers->{link} and {x-robots-tag} present AND lowercased. Assert {} default when absent. The point: consumers match header names case-insensitively without knowing origin casing.
+
+RELEASE
+Changes line. dzil owns $VERSION (do NOT hand-bump). Once released -> swap vendored tarball in goldmine (content swap, not version bump).
