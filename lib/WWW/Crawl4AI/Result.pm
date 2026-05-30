@@ -143,6 +143,16 @@ C<href>, C<text> and C<title>. For just the URLs, use L</urls>.
 
 =cut
 
+has response_headers => ( is => 'ro', default => sub { {} } );
+
+=attr response_headers
+
+The HTTP response headers from the origin fetch (after redirects resolved), as
+a dict with lowercase keys. Absent or headerless responses yield an empty hash.
+Consumers can match header names case-insensitively without knowing origin casing.
+
+=cut
+
 has _json => (
   is      => 'lazy',
   default => sub { JSON::MaybeXS->new( utf8 => 0, canonical => 1, convert_blessed => 1 ) },
@@ -163,7 +173,8 @@ sub from_attempt {
     cost_class => $attempt->cost_class,
     signals    => $attempt->signals,
     why_failed => $attempt->why_failed,
-    links      => $page->{links} // { internal => [], external => [] },
+    links            => $page->{links} // { internal => [], external => [] },
+    response_headers => _lc_headers( $page->{response_headers} ),
     %extra,
   );
 }
@@ -239,8 +250,9 @@ sub to_hash {
     markdown   => $self->markdown,
     signals    => $self->signals,
     why_failed => $self->why_failed,
-    links      => $self->links,
-    urls       => $self->urls,
+    links            => $self->links,
+    urls             => $self->urls,
+    response_headers => $self->response_headers,
     ( defined $self->error ? ( error => "@{[ $self->error ]}" ) : () ),
     attempts   => [ map { $_->to_hash } @{ $self->attempts } ],
   };
@@ -268,4 +280,12 @@ The attempt history encoded as a JSON string.
 
 =cut
 
+# Lowercase all header keys for deterministic, case-insensitive matching by callers.
+sub _lc_headers {
+  my ($h) = @_;
+  return {} unless ref $h eq 'HASH';
+  return { map { lc($_) => $h->{$_} } keys %$h };
+}
+
 1;
+
