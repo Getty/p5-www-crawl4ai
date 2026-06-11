@@ -50,6 +50,29 @@ my $RE_CAPTCHA_PROMPT = qr/
 my $RE_WALL    = qr/cf-chl|cf_chl|__cf_|datadome|perimeterx|px-captcha|akamai|incapsula|imperva/i;
 my $RE_TITLE   = qr/^\s*just\s+a\s+moment|^\s*attention\s+required|^\s*access\s+denied/i;
 
+# A WAF / bot-management gate (Cloudflare, DataDome, PerimeterX, Akamai) often
+# does not embed a widget into the requested page -- it REDIRECTS to a dedicated
+# challenge URL. reCAPTCHA / hCaptcha redirects land on the provider's own
+# verification endpoint. We key purely on the final (post-redirect) URL's
+# host+path matching a known challenge endpoint: a real content page's
+# final_url never contains /cdn-cgi/challenge etc., so URL equality with the
+# requested URL is irrelevant (and checking it would false-positive on cosmetic
+# http->https / www<->apex / trailing-slash redirects).
+my $RE_CHALLENGE_CAPTCHA = qr{
+    (?:www\.)?google\.com/recaptcha   # reCAPTCHA verification endpoint
+  | /recaptcha/api                    # reCAPTCHA api2/anchor frame
+  | \bhcaptcha\.com\b                 # hCaptcha challenge host
+}ix;
+my $RE_CHALLENGE_WALL = qr{
+    /cdn-cgi/challenge                 # Cloudflare managed challenge
+  | __cf_chl                          # Cloudflare challenge query/path token
+  | /challenge-platform/             # Cloudflare challenge-platform asset
+  | datadome                          # DataDome (host or path)
+  | geo\.captcha-delivery\.com        # DataDome captcha delivery host
+  | /px/captcha                       # PerimeterX captcha path
+  | perimeterx                        # PerimeterX (host or path)
+}ix;
+
 #----------------------------------------------------------------------
 # Content classification
 #----------------------------------------------------------------------
@@ -62,14 +85,24 @@ sub signals {
   my $html  = ( $page->{raw_html} // $page->{html} // '' );
   my $title = $page->{title} // '';
   my $code  = $page->{status_code} // 0;
+  # The post-redirect URL, falling back to the requested URL when the normalized
+  # page omits it. Either may be absent (signals() is also called on bare test
+  # hashes) -- when so, the challenge-URL checks below simply find no match and
+  # no signal is raised. Never warns/dies on missing keys.
+  my $final = $page->{final_url} // $page->{url} // '';
 
   # 'blocked' is about content fingerprints (bot walls in the body), not HTTP
   # status — status lives on its own axis (http_error) so why_failed can report
   # a bare 403 as http_403 while a Cloudflare body still reads bot_wall_detected.
+  # ADDITIONALLY: a WAF/bot-management gate often redirects to a challenge URL
+  # (e.g. /cdn-cgi/challenge, geo.captcha-delivery.com). When the final_url
+  # matches a known challenge endpoint we OR that in -- we never clear a signal
+  # already raised by a body fingerprint.
   my $blocked =
        ( $md   =~ $RE_BLOCK )
     || ( $html =~ $RE_WALL )
-    || ( $title =~ $RE_TITLE );
+    || ( $title =~ $RE_TITLE )
+    || ( $final =~ $RE_CHALLENGE_WALL );
 
   # A captcha marker alone does not wall a page -- context decides. Three rules:
   #   * thin page + any marker (markdown OR html) -> wall. A near-empty page that
@@ -83,10 +116,15 @@ sub signals {
   #   * rich page + html-only marker -> NOT a wall. An embedded widget (comment-
   #     form reCAPTCHA, Turnstile login box) leaves markers only in the markup
   #     (class names, script src), never in the visible content.
+  #   * redirect to a CAPTCHA provider's own verification endpoint
+  #     (google.com/recaptcha, hcaptcha.com) -> wall. The final_url left the
+  #     origin entirely and landed on the captcha provider. OR-ed in; an
+  #     already-true captcha signal is never cleared.
   my $thin    = length($md) < $min;
   my $captcha =
        ( $thin && ( $md =~ $RE_CAPTCHA || $html =~ $RE_CAPTCHA ) )
-    || ( $md =~ $RE_CAPTCHA && $md =~ $RE_CAPTCHA_PROMPT );
+    || ( $md =~ $RE_CAPTCHA && $md =~ $RE_CAPTCHA_PROMPT )
+    || ( $final =~ $RE_CHALLENGE_CAPTCHA );
 
   return {
     js_required => ( $md =~ $RE_JS ) ? 1 : 0,
@@ -106,6 +144,12 @@ C<< min_markdown => N >> to override the thin-content threshold
 
 C<blocked> reflects content fingerprints (Cloudflare / DataDome / "Just a
 moment" bodies) — not HTTP status, which lives on its own C<http_error> axis.
+It is B<also> raised when the page's C<final_url> (the post-redirect URL, with
+fallback to C<url>) matches a known WAF / bot-management challenge endpoint
+(C</cdn-cgi/challenge>, C<__cf_chl>, C</challenge-platform/>, C<datadome>,
+C<geo.captcha-delivery.com>, C</px/captcha>, C<perimeterx>) — many gates
+redirect to a challenge URL rather than embedding a widget. This is OR-ed in;
+a signal already raised by a body fingerprint is never cleared.
 
 C<captcha> means the page is captcha-I<walled>, not merely that a captcha
 widget or the word "reCAPTCHA" appears somewhere. Context decides:
@@ -132,6 +176,13 @@ language (a cookie-banner / privacy-policy note that the site uses reCAPTCHA),
 or that carries the marker only in the HTML/script markup (an embedded
 comment-form reCAPTCHA, a Turnstile login box), is B<not> walled — the real
 content is present.
+
+=item *
+
+A page whose C<final_url> redirected to a CAPTCHA provider's own verification
+endpoint (C<google.com/recaptcha>, C</recaptcha/api>, C<hcaptcha.com>) is
+walled regardless of body content — the request left the origin and landed on
+the captcha provider.
 
 =back
 
