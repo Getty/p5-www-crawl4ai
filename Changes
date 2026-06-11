@@ -1,5 +1,12 @@
 {{$NEXT}}
 
+ - Detect: captcha signal no longer false-positives on cookie-banner /
+   privacy-policy mentions of reCAPTCHA. A content-rich page now only walls when
+   a markdown captcha marker co-occurs with captcha-PROMPT language ("complete
+   the captcha to continue", "I'm not a robot", "verify you are human", …); thin
+   pages still wall on any marker (JS-rendered gate) and html-only markers on
+   rich pages still never wall
+
 0.002     2026-05-30 22:57:39Z
 
  - Result: expose response_headers (lowercased keys) from the origin HTTP fetch,

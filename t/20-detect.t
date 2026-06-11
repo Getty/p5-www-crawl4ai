@@ -67,6 +67,31 @@ subtest 'embedded captcha widget on rich page is not a wall' => sub {
   is WWW::Crawl4AI::Detect::why_failed($p), undef, 'no failure reason';
 };
 
+subtest 'reCAPTCHA cookie-banner mention on rich page is not a wall' => sub {
+  # The aquaponik regression: a content-rich page whose markdown ALSO carries a
+  # cookie-banner / privacy-policy mention of reCAPTCHA -- but NO captcha-prompt
+  # language. This is an incidental mention, not a gate. Must stay good.
+  my $body = 'real article body text about aquaponik systems ' x 30;  # >500 chars
+
+  my $de = {
+    success     => 1,
+    status_code => 200,
+    markdown    => $body . ' Wird von Google reCAPTCHA gesetzt, um Spam zu verhindern. ' . $body,
+    title       => 'Aquaponik Ratgeber',
+  };
+  ok !WWW::Crawl4AI::Detect::signals($de)->{captcha}, 'german cookie-banner mention: no captcha signal';
+  ok WWW::Crawl4AI::Detect::is_good($de), 'rich page with german reCAPTCHA mention is good';
+
+  my $en = {
+    success     => 1,
+    status_code => 200,
+    markdown    => $body . ' This site uses Google reCAPTCHA to protect against spam. ' . $body,
+    title       => 'Aquaponics Guide',
+  };
+  ok !WWW::Crawl4AI::Detect::signals($en)->{captcha}, 'english cookie-banner mention: no captcha signal';
+  ok WWW::Crawl4AI::Detect::is_good($en), 'rich page with english reCAPTCHA mention is good';
+};
+
 subtest 'html-only captcha marker on a thin page still walls' => sub {
   # JS-rendered captcha gate: markdown is empty, marker lives in the markup.
   my $p = {

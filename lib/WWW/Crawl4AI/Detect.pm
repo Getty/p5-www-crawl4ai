@@ -34,7 +34,19 @@ my %SOFT_FAIL = map { $_ => 1 } ( 401, 403, 429 );
 
 my $RE_JS      = qr/enable\s+javascript|please\s+enable\s+js|requires?\s+javascript/i;
 my $RE_BLOCK   = qr/access\s+denied|checking\s+your\s+browser|are\s+you\s+(?:a\s+)?human|verify\s+you\s+are\s+human|unusual\s+traffic/i;
-my $RE_CAPTCHA = qr/\b(?:re)?captcha\b|hcaptcha|g-recaptcha|cf-turnstile/i;
+my $RE_CAPTCHA = qr/(?:\b(?:re)?captcha\b|hcaptcha|g-recaptcha|cf-turnstile)/i;
+# Prompt language that signals a captcha *wall* (a gate the visitor must clear)
+# rather than an incidental mention (a cookie-banner / privacy-policy note about
+# reCAPTCHA). A wall tells the visitor to act on the captcha, or that the page is
+# being held until they prove they are human.
+my $RE_CAPTCHA_PROMPT = qr/
+    (?:complete|solve|finish|pass|verify)\b[^.]{0,40}$RE_CAPTCHA   # "complete the captcha"
+  | $RE_CAPTCHA[^.]{0,40}(?:to\s+continue|to\s+proceed|to\s+access)  # "captcha to continue"
+  | i['\x{2019}]?m\s+not\s+a\s+robot                              # "I'm not a robot"
+  | (?:verify|prove|confirm)\s+(?:that\s+)?you\s+are\s+(?:a\s+)?human  # "verify you are human"
+  | checking\s+your\s+browser
+  | security\s+check
+/ix;
 my $RE_WALL    = qr/cf-chl|cf_chl|__cf_|datadome|perimeterx|px-captcha|akamai|incapsula|imperva/i;
 my $RE_TITLE   = qr/^\s*just\s+a\s+moment|^\s*attention\s+required|^\s*access\s+denied/i;
 
@@ -59,14 +71,22 @@ sub signals {
     || ( $html =~ $RE_WALL )
     || ( $title =~ $RE_TITLE );
 
-  # A captcha marker only walls the page when its prompt shows up in the
-  # *rendered* text (markdown). An embedded widget -- a comment-form reCAPTCHA,
-  # a Cloudflare Turnstile login box -- leaves markers only in the HTML/script
-  # markup (class names, script src), not the visible content, so an HTML-only
-  # match on an otherwise content-rich page is NOT a wall. Treat an HTML-only
-  # match as blocking only when the page is also thin (a JS-rendered gate).
+  # A captcha marker alone does not wall a page -- context decides. Three rules:
+  #   * thin page + any marker (markdown OR html) -> wall. A near-empty page that
+  #     mentions a captcha is a JS-rendered gate (the real content never loaded).
+  #   * rich page + markdown marker + wall-PROMPT language -> wall. A verbose
+  #     captcha page ("complete the hCaptcha to continue", "I'm not a robot")
+  #     carries prompt language in its rendered text.
+  #   * rich page + markdown marker but NO prompt language -> NOT a wall. This is
+  #     an incidental mention -- a cookie banner / privacy policy noting that the
+  #     site uses reCAPTCHA. The real content is present; do not punish it.
+  #   * rich page + html-only marker -> NOT a wall. An embedded widget (comment-
+  #     form reCAPTCHA, Turnstile login box) leaves markers only in the markup
+  #     (class names, script src), never in the visible content.
   my $thin    = length($md) < $min;
-  my $captcha = ( $md =~ $RE_CAPTCHA ) || ( $html =~ $RE_CAPTCHA && $thin );
+  my $captcha =
+       ( $thin && ( $md =~ $RE_CAPTCHA || $html =~ $RE_CAPTCHA ) )
+    || ( $md =~ $RE_CAPTCHA && $md =~ $RE_CAPTCHA_PROMPT );
 
   return {
     js_required => ( $md =~ $RE_JS ) ? 1 : 0,
@@ -88,10 +108,32 @@ C<blocked> reflects content fingerprints (Cloudflare / DataDome / "Just a
 moment" bodies) — not HTTP status, which lives on its own C<http_error> axis.
 
 C<captcha> means the page is captcha-I<walled>, not merely that a captcha
-widget exists somewhere: a marker in the rendered markdown counts, but a
-marker found only in the HTML/script markup (an embedded comment-form
-reCAPTCHA, a Turnstile login box) counts only when the page is also thin —
-otherwise a content-rich page with an embedded widget is treated as good.
+widget or the word "reCAPTCHA" appears somewhere. Context decides:
+
+=over 4
+
+=item *
+
+A B<thin> page with a captcha marker anywhere (rendered markdown I<or>
+HTML/script markup) is walled — a near-empty page that mentions a captcha is a
+JS-rendered gate.
+
+=item *
+
+A B<content-rich> page is walled only when a markdown marker co-occurs with
+captcha-I<prompt> language ("complete the captcha to continue", "I'm not a
+robot", "verify you are human", "checking your browser", "security check") —
+the wording a real captcha gate uses to address the visitor.
+
+=item *
+
+A content-rich page whose markdown mentions a captcha B<without> prompt
+language (a cookie-banner / privacy-policy note that the site uses reCAPTCHA),
+or that carries the marker only in the HTML/script markup (an embedded
+comment-form reCAPTCHA, a Turnstile login box), is B<not> walled — the real
+content is present.
+
+=back
 
 =cut
 
