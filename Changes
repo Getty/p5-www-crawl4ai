@@ -1,3 +1,5 @@
+{{$NEXT}}
+
 0.004     2026-06-11 14:24:19Z
 
  - Detect: content volume is now the master signal. Every signal derived from a

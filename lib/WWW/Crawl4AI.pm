@@ -12,7 +12,7 @@ use WWW::Crawl4AI::Detect ();
 use WWW::Crawl4AI::StrategyChain ();
 use WWW::Crawl4AI::DeepCrawlIterator ();
 
-our $VERSION = '0.004';
+our $VERSION = '0.005';
 
 =head1 SYNOPSIS
 
