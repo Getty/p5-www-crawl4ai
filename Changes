@@ -1,4 +1,4 @@
-{{$NEXT}}
+0.003     2026-06-11 02:22:02Z
 
  - Detect: captcha signal no longer false-positives on cookie-banner /
    privacy-policy mentions of reCAPTCHA. A content-rich page now only walls when
