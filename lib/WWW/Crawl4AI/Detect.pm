@@ -163,8 +163,6 @@ redirect to a captcha provider's own verification endpoint
 on a content-rich page (cookie-banner note, embedded comment-form reCAPTCHA,
 Turnstile login box) is B<not> a wall — the real content is present.
 
-=back
-
 =cut
 
 sub is_good {
