@@ -1,4 +1,4 @@
-{{$NEXT}}
+0.005     2026-06-12 15:23:16Z
 
  - Detect: removed every body-text and HTML/title fingerprint from the block
    classifier. is_good now discards a page only on thin_html, an HTTP push-back
