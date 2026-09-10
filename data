@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-10T03:40:16Z
+claimed_by: worker-c
+class: standard
+completed: 2026-09-10T03:40:16Z
+created: 2026-08-18T17:52:18Z
+id: 2
+priority: medium
+started: 2026-09-10T03:37:38Z
+status: done
+tags:
+- needs-triage
+title: classify_signals/classify_why_failed override steuert nicht die Chain-Entscheidung
+updated: 2026-09-10T03:40:20Z
+---
+
+**Befund (docs-drift-audit 2026-08-18):** Der Kommentar in _attempt_for und die POD versprechen, dass ein Subclass-Override von classify_signals/classify_why_failed den Classifier austauscht. Tatsächlich ruft _attempt_for die Gewinner-Entscheidung hart auf: `my $good = WWW::Crawl4AI::Detect::is_good( $page, %$detect );` (lib/WWW/Crawl4AI.pm:268). Ein Override ändert damit nur die *berichteten* signals/why_failed pro Attempt, nicht welche Strategy gewinnt bzw. ob die Chain weiterläuft.
+
+**Zu entscheiden:** (a) Intended — dann POD/Kommentar entsprechend einschränken, oder (b) Bug — dann eine überschreibbare Methode (z. B. classify_is_good) einführen und in _attempt_for dispatchen. Variante (b) passt zum ADR-0001-Geist (pluggable policy) und zum CONTEXT.md-Dialog. Betrifft auch Net::Async::Crawl4AI (_attempt_for wird geteilt).
+
+CONTEXT.md und der getty-perl-crawl4ai-Skill beschreiben seit 2026-08-18 den Ist-Zustand mit Caveat und verweisen auf dieses Ticket.
+
+Fix: overridable classify_is_good eingeführt und in _attempt_for dispatcht (default = Detect::is_good, Standardverhalten unverändert). POD/Kommentar korrigiert. Regressionstest t/45-classify-override.t: stricter override => Chain läuft weiter, looser override => Chain stoppt früh (beides vorher unmöglich). Suite prove -lr t/ grün: 93 Tests. Commit fdadbc8. Gettys WIP (StrategyChain.pm + Drift) unangetastet. Hinweis: _attempt_for wird mit Net::Async::Crawl4AI geteilt -> gepaarte Aenderung dort noetig (Koordinator).
