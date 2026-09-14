@@ -2,9 +2,10 @@
 name: release-preflight
 description: Use before any dzil release, when the user asks whether the dist is release-ready, or after version bumps — checks Changes, per-file $VERSION, dist.ini, cpanfile, and package layout. Read-only; never fixes.
 tools: Read, Grep, Glob, Bash
-skills:
-  - getty-perl-release-author-getty
-  - perl-release-dist-ini
+briefing:
+  skills:
+    - getty-perl-release-author-getty
+    - perl-release-dist-ini
 color: green
 ---
 
