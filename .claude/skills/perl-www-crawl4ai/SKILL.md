@@ -74,13 +74,13 @@ dropped). `fallback` is a constructor attribute, not a per-call option.
   `add_strategy` / `remove_strategy` / `replace_strategy` on the
   `StrategyChain` at runtime. Subclassing the chain's default class list goes
   via `chain_classes` (there is no `_build_default_strategies`).
-- Reported classification is overridable: subclass `WWW::Crawl4AI` and
-  override `classify_signals` / `classify_why_failed` — they produce the
-  `signals` and `why_failed` on every Attempt. **Caveat:** the win/continue
-  decision currently calls `WWW::Crawl4AI::Detect::is_good` directly
-  (`_attempt_for`), so an override changes what is *reported*, not which
-  strategy wins — a known limitation, so verify against the current
-  implementation before relying on an override.
+- Classification is overridable: subclass `WWW::Crawl4AI` and override
+  `classify_is_good` — the win/continue lever (default:
+  `WWW::Crawl4AI::Detect::is_good`). Since 0.006 `_attempt_for` dispatches the
+  decision through it, so an override actually changes which strategy wins and
+  whether the chain escalates. `classify_signals` / `classify_why_failed` are
+  overridable too, but they only shape the `signals` and `why_failed` *reported*
+  on each Attempt, not the decision.
 
 ## Classification (the other half)
 
