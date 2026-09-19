@@ -1,4 +1,4 @@
-{{$NEXT}}
+0.006     2026-09-19 17:09:50Z
 
  - The chain win/continue decision now runs through an overridable
    classify_is_good method (default: WWW::Crawl4AI::Detect::is_good), instead of
