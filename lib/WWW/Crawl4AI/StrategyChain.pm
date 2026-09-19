@@ -23,18 +23,16 @@ our $VERSION = '0.001';
   # Subclass to override defaults:
   package My::Chain;
   use parent 'WWW::Crawl4AI::StrategyChain';
-  sub _build_default_strategies {
-    [ WWW::Crawl4AI::Strategy::Plain->new ]
-  }
+  sub chain_classes { qw( WWW::Crawl4AI::Strategy::Plain ) }
 
 =head1 DESCRIPTION
 
 Holds the ordered list of strategy objects that power the fallback chain.
 Replaces the hardcoded C<@CHAIN_CLASSES> array in C<WWW::Crawl4AI>.
 
-B<No fat globals>: strategies live in the object. Subclass
-L</_build_default_strategies> to change defaults; use L</add_strategy>,
-L</remove_strategy>, L</replace_strategy> to mutate after construction.
+B<No fat globals>: strategies live in the object. Subclass L</chain_classes>
+to change defaults; use L</add_strategy>, L</remove_strategy>,
+L</replace_strategy> to mutate after construction.
 
 =cut
 
@@ -50,8 +48,8 @@ my @CHAIN_CLASSES = qw(
 
 =func chain_classes
 
-Returns the raw class-name array. Override this to change the default class
-list without subclassing L</_build_default_strategies>.
+Returns the raw class-name array. Override this in a subclass to change the
+default class list; C<_build_strategies> instantiates one object per class.
 
 =cut
 
