@@ -7,6 +7,8 @@ use feature 'say';
 use Getopt::Long;
 use WWW::Crawl4AI;
 
+our $VERSION = '0.001';
+
 my %opt = ( show => 400 );
 GetOptions(
   'base-url=s'         => \$opt{base_url},

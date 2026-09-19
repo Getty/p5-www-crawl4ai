@@ -8,6 +8,8 @@ use feature 'say';
 use Getopt::Long;
 use WWW::Crawl4AI;
 
+our $VERSION = '0.001';
+
 binmode STDOUT, ':encoding(UTF-8)';
 
 my %opt;
