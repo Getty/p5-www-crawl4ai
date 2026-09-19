@@ -16,6 +16,12 @@
    0.9.3 SSRF switches CRAWL4AI_ALLOW_INTERNAL_URLS and
    CRAWL4AI_EXECUTE_JS_ENABLED are documented alongside.
 
+ - examples/k8s/ adds a deployable sample stack -- namespace, Crawl4AI
+   Deployment/Service/Secret and an nginx fixture ConfigMap -- carrying the
+   0.9.3 security posture (API token, SSRF guard, execute_js switch) in the
+   manifests and README. examples/fixture/ is the deterministic page the
+   env-gated live suite points at.
+
 0.005     2026-06-12 15:23:16Z
 
  - Detect: removed every body-text and HTML/title fingerprint from the block
