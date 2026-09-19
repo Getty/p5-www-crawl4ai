@@ -3,6 +3,7 @@ package WWW::Crawl4AI::Client;
 use Moo;
 use Carp qw( croak );
 use HTTP::Request ();
+use LWP::UserAgent ();
 use JSON::MaybeXS ();
 use URI ();
 use URI::Escape ();
@@ -162,7 +163,6 @@ sub _build__retry_status_set {
 
 sub _build_ua {
   my ( $self ) = @_;
-  require LWP::UserAgent;
   return LWP::UserAgent->new(
     agent   => $self->user_agent_string,
     timeout => $self->timeout,
