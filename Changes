@@ -8,6 +8,14 @@
    could be overridden, which changed just the *reported* signals per attempt,
    not the decision, contradicting the POD. Default behaviour is unchanged.
 
+ - examples/docker-compose.yml and docker-compose.proxy.yml now set
+   CRAWL4AI_API_TOKEN. Crawl4AI 0.9.3 binds the container's loopback only when
+   no token is set, so the published 11235 port reset every connection and the
+   sample stack was unreachable out of the box; with a token it binds 0.0.0.0
+   and requires Bearer auth (the client sends $ENV{CRAWL4AI_API_TOKEN}). The
+   0.9.3 SSRF switches CRAWL4AI_ALLOW_INTERNAL_URLS and
+   CRAWL4AI_EXECUTE_JS_ENABLED are documented alongside.
+
 0.005     2026-06-12 15:23:16Z
 
  - Detect: removed every body-text and HTML/title fingerprint from the block
