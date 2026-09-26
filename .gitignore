@@ -10,6 +10,8 @@
 !.claude/agents/**
 !.claude/skills/
 !.claude/skills/**
+!.claude/rules/
+!.claude/rules/**
 !.claude/hooks/
 !.claude/hooks/**
 

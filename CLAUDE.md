@@ -8,12 +8,16 @@ Wahrheit, nicht die Doku: `lib/WWW/Crawl4AI/Detect.pm` und `Changes` zuerst.
 
 ## Subagents (`.claude/agents/`)
 
-- **karr-triage** — Issues/PRDs auf dem karr-Board triagieren und labeln.
-- **release-preflight** — Read-only-Checkliste vor jedem `dzil release`.
+Delegation und Hausregeln: `.claude/rules/crawl4ai-rules.md` (automatisch geladen).
+
+- **crawl4ai-worker** — Standard für Implementieren, Refactoren, Debuggen, Tests.
+- **crawl4ai-release-manager** — einzige Rolle, die committet; `Changes`, Karte →
+  done, Release-Audit vor jedem `dzil release`.
 - **crawl-chain-probe** — eine URL live durch die Strategy Chain jagen und die
   Attempt-Tabelle diagnostizieren.
 - **docs-drift-auditor** — Skills/CONTEXT.md/ADRs gegen `lib/` auf Drift
   prüfen; nach größeren Änderungen an `lib/` und vor Releases einsetzen.
+- **karr-triage** — Issues/PRDs auf dem karr-Board triagieren und labeln.
 
 ## Agent skills
 
