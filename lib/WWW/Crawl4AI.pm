@@ -16,6 +16,7 @@ our $VERSION = '0.007';
 
 =head1 SYNOPSIS
 
+  use feature 'say';
   use WWW::Crawl4AI;
 
   my $crawler = WWW::Crawl4AI->new(
