@@ -596,11 +596,15 @@ sub do_request {
   croak "do_request needs an HTTP::Request" unless $self->is_request($req);
   my $max = $self->max_attempts;
   my $res;
+  my $is_transport = sub {
+    my $r = shift;
+    return $r->code == 599 || ( ( $r->header('Client-Warning') // '' ) eq 'Internal response' );
+  };
   for my $attempt ( 1 .. $max ) {
     $res = $self->ua->request($req);
     last if $res->is_success;
     my $code = $res->code;
-    my $transport = $code == 599 || ( ( $res->header('Client-Warning') // '' ) eq 'Internal response' );
+    my $transport = $is_transport->($res);
     my $retryable = $transport || $self->_retry_status_set->{$code};
     if ( $retryable && $attempt < $max ) {
       my $delay = $self->retry_backoff->[ $attempt - 1 ] // $self->retry_backoff->[-1] // 1;
@@ -613,7 +617,7 @@ sub do_request {
     }
     last;
   }
-  if ( !$res->is_success && ( $res->code == 599 ) ) {
+  if ( !$res->is_success && $is_transport->($res) ) {
     die WWW::Crawl4AI::Error->new(
       type        => 'transport',
       message     => "Crawl4AI transport error: " . ( $res->content // $res->message // 'unreachable' ),
