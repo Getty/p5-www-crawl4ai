@@ -1,0 +1,31 @@
+---
+class: standard
+completed: 2026-10-13T19:50:23Z
+created: 2026-10-06T19:48:29Z
+id: 3
+priority: medium
+started: 2026-10-13T19:50:23Z
+status: done
+tags:
+- bug
+- error-handling
+- drift
+- review-2026-10-06
+title: Unreachable server is reported as type 'api' with status 500, never as 'transport',
+  with the default LWP backend
+updated: 2026-10-13T19:50:23Z
+---
+
+`do_request` recognises a transport failure for the retry decision by status 599 *or* LWP's `Client-Warning: Internal response` header (`lib/WWW/Crawl4AI/Client.pm:603`), but raises the `type => 'transport'` error only for status 599 (`Client.pm:616-624`). LWP::UserAgent, the default `ua`, never produces 599 - it synthesises a 500. So the response falls through to `_decode`, which throws `type => 'api'` (`Client.pm:333-341`).
+
+Reproduce:
+
+    perl -Ilib -e 'use WWW::Crawl4AI::Client; eval { WWW::Crawl4AI::Client->new(base_url => "http://127.0.0.1:9", max_attempts => 1)->html("http://example.com") }; printf "%s %s %s\n", $@->type, $@->status_code, $@->message'
+    # api 500 Crawl4AI HTTP 500: Can't connect to 127.0.0.1:9 (Connection refused)
+
+`WWW::Crawl4AI::Error` documents `transport` as 'could not reach the Crawl4AI server at all' with `status_code` 0 (`lib/WWW/Crawl4AI/Error.pm:44,85`); `is_transport` is therefore never true for LWP users, and a Crawl4AI container that is down is indistinguishable from one that answered 500. Net::Async::Crawl4AI raises `transport`/0 for the same situation (`Net/Async/Crawl4AI.pm:234-243`), so code written against one sibling misbehaves on the other.
+
+Done when: the post-loop check uses the same `$transport` condition as the retry decision (599 or Internal response), with a test using a stub UA that returns an LWP-style internal 500.
+
+---
+Fleet review 2026-10-06 · kind: bug · confidence: verified
