@@ -1,0 +1,30 @@
+---
+claimed_at: 2026-10-20T10:00:17Z
+claimed_by: k4-k8
+class: standard
+completed: 2026-10-20T10:00:17Z
+created: 2026-10-20T08:49:49Z
+id: 5
+priority: high
+started: 2026-10-20T09:24:07Z
+status: done
+tags:
+- http
+- errors
+title: An answer that is not JSON must be an error
+updated: 2026-10-20T10:00:17Z
+---
+
+The JSON parse errors are swallowed.
+
+lib/WWW/Crawl4AI/Client.pm:332 decodes the body inside an eval, but never looks at $@. On a 200 with an HTML body $data stays undef, and the parsers answer quietly wrong: parse_crawl_response gives [] (:349), parse_md_response gives undef (:370), parse_job_status_response gives {status => 'UNKNOWN'} (:386), parse_health_response gives 1 (:409).
+
+Failure case: the login page of a captive portal or of a proxy answers the health request with 200 and HTML. health() reports "ok", www-crawl4ai-doctor prints "ok", and the strategy chain reports "all crawl strategies failed (no_strategies)" instead of "the answer was no JSON".
+
+Decide: the decode is checked and WWW::Crawl4AI::Error (type api, with status, method and path) is raised.
+
+The test that holds this down must be red against the old lib/ and fail as a failed expectation, not as a die.
+
+Commit e1b7d59: _decode checks the decode result, a non-empty body that is no JSON raises a type=api error with status, method and path; an empty body stays allowed and is not decoded. Decision (within the card): parse_health_response answers 1 for a JSON object and 0 for every other answer - a JSON scalar (false, true, number, string), a JSON array and an empty body; healthy is only claimed when an object arrives, and an empty body stays error-free per the house rule. Suite: 15 files / 119 tests green (offline).
+
+Commit 0d73048 (ersetzt e1b7d59, History neu geschrieben, Inhalt unveraendert): _decode prueft das Decode-Ergebnis, ein nicht leerer Body ohne JSON ist ein type=api Fehler mit Status, Methode und Pfad, ein leerer Body bleibt erlaubt. Suite: 17 Dateien / 135 Tests gruen (offline).
