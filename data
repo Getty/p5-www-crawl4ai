@@ -1,0 +1,30 @@
+---
+claimed_at: 2026-10-20T10:00:12Z
+claimed_by: k4-k8
+class: standard
+completed: 2026-10-20T10:00:12Z
+created: 2026-10-20T08:49:44Z
+id: 4
+priority: high
+started: 2026-10-20T09:24:00Z
+status: done
+tags:
+- cpanfile
+- dependencies
+title: The distribution must declare LWP::Protocol::https
+updated: 2026-10-20T10:00:12Z
+---
+
+cpanfile:5 requires LWP::UserAgent 6.00, but not LWP::Protocol::https. The base url is changeable through CRAWL4AI_URL and CRAWL4AI_BASE_URL (lib/WWW/Crawl4AI/Client.pm:51, lib/WWW/Crawl4AI.pm:112) and through --base-url (bin/www-crawl4ai-doctor:17), and it may be an https url.
+
+Failure case: a fresh installation with CRAWL4AI_URL=https://crawl4ai.example gets the answer "Protocol scheme 'https' is not supported" (HTTP 501) from LWP. The client reports "Crawl4AI HTTP 501", although the server is healthy.
+
+Decide: the cpanfile declares LWP::Protocol::https.
+
+Commit a4a0906: cpanfile declares LWP::Protocol::https (file finding, no behavioural test): before, cpanfile:5 required LWP::UserAgent 6.00 only, so a fresh install on an https base url answered 501 'Protocol scheme https is not supported'; after, the line is there (alphabetical, unversioned). Suite: 16 files / 125 tests green (offline).
+
+Also found: p5-net-async-crawl4ai calls parse_health_response in its health path and promises 'resolves to 1 ... else 0, never fails'; with the k5 rule (a non-JSON answer raises) that path can now fail with a Future error instead of answering 0. The change lives in this repo, the promise is in the sibling repo - not touched here.
+
+Commit 20f9502 (ersetzt a4a0906, History neu geschrieben): cpanfile deklariert LWP::Protocol::https. Suite: 17 Dateien / 135 Tests gruen (offline).
+
+Also found: die Transportfehler-Meldung in do_request (aus k3) traegt den rohen mehrzeiligen LWP-Text mit Stacktrace in der Meldung; gekuerzt wird deshalb an der Quelle der Warnung in health, do_request selbst bleibt unangetastet.
