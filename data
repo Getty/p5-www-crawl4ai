@@ -1,0 +1,30 @@
+---
+claimed_at: 2026-10-20T10:00:21Z
+claimed_by: k4-k8
+class: standard
+completed: 2026-10-20T10:00:21Z
+created: 2026-10-20T08:49:53Z
+id: 6
+priority: medium
+started: 2026-10-20T09:24:13Z
+status: done
+tags:
+- http
+- encoding
+title: The task id must be encoded as one path segment
+updated: 2026-10-20T10:00:21Z
+---
+
+The task id goes into the path unencoded.
+
+lib/WWW/Crawl4AI/Client.pm:234 builds the url with '/crawl/job/' . $task_id. The llm_request (:299) encodes the value correctly with uri_escape_utf8, the job request does not.
+
+Failure case: the task_id "../../health" gives the uri .../crawl/job/../../health, which is not normalised, and addresses another endpoint; a ? or a # in the value splits path and query.
+
+Decide: the task id is encoded as one UTF-8 percent encoded segment, like llm_request does.
+
+The test that holds this down must be red against the old lib/ and fail as a failed expectation, not as a die.
+
+Commit 38daaa2: job_status_request encodes the task id as one percent encoded UTF-8 segment (uri_escape_utf8), so it can neither address another endpoint nor split path and query. Suite: 16 files / 125 tests green (offline).
+
+Commit 45092d6 (ersetzt 38daaa2, History neu geschrieben, Inhalt unveraendert): job_status_request kodiert die Task-ID als ein UTF-8 Segment. Suite: 17 Dateien / 135 Tests gruen (offline).
