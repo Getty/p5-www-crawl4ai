@@ -1,0 +1,28 @@
+---
+claimed_at: 2026-10-20T10:00:26Z
+claimed_by: k4-k8
+class: standard
+completed: 2026-10-20T10:00:26Z
+created: 2026-10-20T08:49:58Z
+id: 7
+priority: medium
+started: 2026-10-20T09:24:19Z
+status: done
+tags:
+- http
+- security
+title: A redirect must not carry the bearer token to another host
+updated: 2026-10-20T10:00:26Z
+---
+
+The user agent is built without max_redirect, so redirects are followed silently.
+
+lib/WWW/Crawl4AI/Client.pm:166-169 builds the LWP::UserAgent without a limit for redirects. The default of LWP is 7, and cpanfile:5 allows LWP::UserAgent 6.00, where the header goes to another host in every case (from 6.83 on, only to a host of the same origin).
+
+Failure case: the server or a proxy answers 302 to a foreign url; the Authorization: Bearer <token> from :190 goes along with it. In addition, a 3xx is never an error but a "success" with a foreign body.
+
+Decide: max_redirect => 0 in the user agent, and every 3xx is raised as an error with status, method and path.
+
+Commit b3d85bd: max_redirect => 0, every 3xx is an api error naming status, method and path (dash without a request), health keeps 0/1 and warns once. Suite: 14 files / 114 tests green (offline).
+
+Commit 3eaac25 (ersetzt b3d85bd, History neu geschrieben): max_redirect => 0, jeder 3xx ist ein api-Fehler mit Status, Methode und Pfad (Dash ohne Request), health bleibt 0/1 und warnt genau einmal - der Grund steht auf einer Zeile, LWP haengt sonst einen Stacktrace an den Connect-Fehler und der landete als Rauschen auf dem stderr des Doctors. Suite: 17 Dateien / 135 Tests gruen (offline).
