@@ -348,7 +348,12 @@ sub _decode {
   my ( $self, $res, $backend ) = @_;
   my $code = $res->code;
   my $body = $res->decoded_content // $res->content // '';
-  my $data = eval { length $body ? $self->_json->decode($body) : undef };
+  my $data;
+  my $json_error;
+  if ( length $body ) {
+    $data = eval { $self->_json->decode($body) };
+    $json_error = $@;
+  }
   if ( !$res->is_success ) {
     my $reason = $res->message;
     $reason = 'error' unless defined $reason && length $reason;
@@ -357,6 +362,15 @@ sub _decode {
       message     => $self->_http_error_message( $res, $reason ),
       response    => $res,
       data        => $data,
+      status_code => $code,
+      backend     => $backend,
+    );
+  }
+  if ($json_error) {
+    die WWW::Crawl4AI::Error->new(
+      type        => 'api',
+      message     => $self->_http_error_message( $res, 'the answer was no JSON' ),
+      response    => $res,
       status_code => $code,
       backend     => $backend,
     );
@@ -384,8 +398,12 @@ Decode and normalize a response. They throw a L<WWW::Crawl4AI::Error> on API,
 transport or job failures. An API error names status, method and path, e.g.
 C<Crawl4AI HTTP 302: Found (GET /crawl/job/abc)>.
 
+An answer that is no JSON is an error as well (C<the answer was no JSON>); an
+empty body stays allowed and is not decoded at all.
+
 C<parse_health_response> treats every failed status - a 3xx included - as an
-error instead of a silent C<0>.
+error instead of a silent C<0>. It answers C<1> for a JSON object and C<0>
+for every other answer, a JSON scalar and an empty body included.
 
 =cut
 
@@ -429,8 +447,8 @@ sub parse_job_status_response {
 sub parse_health_response {
   my ( $self, $res ) = @_;
   my $data = $self->_decode( $res, undef );
-  return $data if ref $data;
-  return 1;
+  return 0 unless defined $data;
+  return ref $data eq 'HASH' ? 1 : 0;
 }
 
 sub parse_screenshot_response {

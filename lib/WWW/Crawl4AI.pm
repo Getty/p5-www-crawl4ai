@@ -476,7 +476,9 @@ sub health { $_[0]->client->health }
 
 =method health
 
-True if the Crawl4AI server answers C<GET /health>.
+True if the Crawl4AI server answers C<GET /health> with a JSON object. A failed
+check answers C<0> and never dies; it warns once (C<crawl4ai health check
+failed: ...>) with the reason.
 
 =cut
 
