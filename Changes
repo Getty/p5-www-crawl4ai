@@ -5,6 +5,8 @@
    the 'Client-Warning: Internal response' header), not only for status 599.
    Previously an unreachable server surfaced as type=api, status 500.
  - SYNOPSIS: enable the 'say' feature so the example runs as written
+ - A redirect is not followed, a 3xx is an error that names the
+   status, the method and the path
 
 0.006     2026-09-19 17:09:50Z
 

@@ -100,7 +100,9 @@ has ua => ( is => 'lazy' );
 
 =attr ua
 
-The L<LWP::UserAgent>. Lazily built; inject your own to swap transports.
+The L<LWP::UserAgent>. Lazily built; inject your own to swap transports. The
+built agent does not follow redirects (C<max_redirect = 0>): a redirect would
+carry the bearer token to a foreign host, so a 3xx is reported as an error.
 
 =cut
 
@@ -166,6 +168,8 @@ sub _build_ua {
   return LWP::UserAgent->new(
     agent   => $self->user_agent_string,
     timeout => $self->timeout,
+    # A redirect would carry the bearer token to a foreign host - refuse them.
+    max_redirect => 0,
   );
 }
 
@@ -325,15 +329,32 @@ sub _payload {
 # Response parsers (no I/O)
 #----------------------------------------------------------------------
 
+# The error text names status, method and path - never the token.
+sub _http_error_message {
+  my ( $self, $res, $reason ) = @_;
+  my $where = '-';
+  my $req = $res->request;
+  if ($req) {
+    my $method = $req->method;
+    my $path   = eval { $req->uri->path };
+    $path = '' unless defined $path;
+    $path = '/' unless length $path;
+    $where = defined $method ? $method . ' ' . $path : $path;
+  }
+  return 'Crawl4AI HTTP ' . $res->code . ': ' . $reason . ' (' . $where . ')';
+}
+
 sub _decode {
   my ( $self, $res, $backend ) = @_;
   my $code = $res->code;
   my $body = $res->decoded_content // $res->content // '';
   my $data = eval { length $body ? $self->_json->decode($body) : undef };
   if ( !$res->is_success ) {
+    my $reason = $res->message;
+    $reason = 'error' unless defined $reason && length $reason;
     die WWW::Crawl4AI::Error->new(
       type        => 'api',
-      message     => "Crawl4AI HTTP $code: " . ( $res->message // 'error' ),
+      message     => $self->_http_error_message( $res, $reason ),
       response    => $res,
       data        => $data,
       status_code => $code,
@@ -360,7 +381,11 @@ sub parse_crawl_response {
 =method parse_health_response
 
 Decode and normalize a response. They throw a L<WWW::Crawl4AI::Error> on API,
-transport or job failures.
+transport or job failures. An API error names status, method and path, e.g.
+C<Crawl4AI HTTP 302: Found (GET /crawl/job/abc)>.
+
+C<parse_health_response> treats every failed status - a 3xx included - as an
+error instead of a silent C<0>.
 
 =cut
 
@@ -403,8 +428,7 @@ sub parse_job_status_response {
 
 sub parse_health_response {
   my ( $self, $res ) = @_;
-  return 0 unless $res->is_success;
-  my $data = eval { $self->_json->decode( $res->decoded_content // '' ) };
+  my $data = $self->_decode( $res, undef );
   return $data if ref $data;
   return 1;
 }
@@ -659,6 +683,10 @@ sub crawl {
 Convenience methods: build request, fire via L<LWP::UserAgent>, parse response.
 See the C<*_request>/C<parse_*_response> pairs for the no-I/O building blocks.
 
+C<health> answers C<1> or C<0> and never dies: a failed check warns once
+(C<crawl4ai health check failed: ...>) with the reason on one line and answers
+C<0>.
+
 =cut
 
 sub md {
@@ -681,9 +709,20 @@ sub job_status {
 
 sub health {
   my ( $self ) = @_;
-  my $res = eval { $self->do_request( $self->health_request ) };
-  return 0 if $@ || !$res;
-  return $self->parse_health_response($res) ? 1 : 0;
+  my $healthy = eval {
+    my $res = $self->do_request( $self->health_request );
+    $self->parse_health_response($res) ? 1 : 0;
+  };
+  if ( my $err = $@ ) {
+    my $message = ref $err && $err->$_isa('WWW::Crawl4AI::Error') ? $err->message : $err;
+    $message = '' unless defined $message;
+    # The reason is one line: LWP hangs a stack trace behind the connect error.
+    $message =~ s/\s*\n.*\z//s;
+    $message =~ s/\s+\z//;
+    warn 'crawl4ai health check failed: ' . $message . "\n" if length $message;
+    return 0;
+  }
+  return $healthy;
 }
 
 sub screenshot {
