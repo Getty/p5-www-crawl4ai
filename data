@@ -1,0 +1,24 @@
+---
+claimed_at: 2026-10-20T10:00:30Z
+claimed_by: k4-k8
+class: standard
+completed: 2026-10-20T10:00:30Z
+created: 2026-10-20T08:50:03Z
+id: 8
+priority: low
+started: 2026-10-20T09:24:24Z
+status: done
+tags:
+- cpanfile
+- test
+title: The declared prerequisites must be checked by a test
+updated: 2026-10-20T10:00:30Z
+---
+
+No test in t/ reads the cpanfile, so a prerequisite that the code uses but that is missing in the cpanfile stays unnoticed. The missing https prerequisite of the cpanfile is exactly such a case.
+
+Decide: a new t/cpanfile.t reads the cpanfile and checks every prerequisite that the code uses. /home/getty/dev/p5-www-vastai/t/cpanfile.t is the pattern to follow.
+
+Commit 3424574: t/cpanfile.t reads the cpanfile and checks HTTP::Request, JSON::MaybeXS, LWP::UserAgent, LWP::Protocol::https, Moo, Safe::Isa and URI. Red proof: the test reads a file, not the behaviour, so it is not red against the old lib/; against the cpanfile before k4 it is red (LWP::Protocol::https missing). Suite: 17 files / 132 tests green (offline).
+
+Commit 3c37958 (ersetzt 3424574, History neu geschrieben, Inhalt unveraendert): t/cpanfile.t liest das cpanfile und prueft HTTP::Request, JSON::MaybeXS, LWP::UserAgent, LWP::Protocol::https, Moo, Safe::Isa und URI. Suite: 17 Dateien / 135 Tests gruen (offline).
