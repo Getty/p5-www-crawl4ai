@@ -220,6 +220,9 @@ sub crawl_request {
 
 Build the L<HTTP::Request> for each endpoint without performing I/O.
 
+C<job_status_request> encodes the task id as one percent encoded UTF-8 path
+segment, so it can neither address another endpoint nor split path and query.
+
 =cut
 
 sub md_request {
@@ -235,7 +238,10 @@ sub job_submit_request {
 sub job_status_request {
   my ( $self, $task_id ) = @_;
   croak "job_status_request needs a task_id" unless defined $task_id && length $task_id;
-  return $self->_request( GET => '/crawl/job/' . $task_id );
+  # The task id is one path segment: encode it, so it cannot address another
+  # endpoint and cannot split path and query.
+  my $segment = URI::Escape::uri_escape_utf8($task_id);
+  return $self->_request( GET => '/crawl/job/' . $segment );
 }
 
 sub health_request { $_[0]->_request( GET => '/health' ) }

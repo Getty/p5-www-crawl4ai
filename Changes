@@ -9,6 +9,7 @@
    status, the method and the path
  - An answer that is no JSON is an error that names the status, the
    method and the path
+ - The task id is encoded as one path segment
 
 0.006     2026-09-19 17:09:50Z
 
