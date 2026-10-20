@@ -1,0 +1,42 @@
+---
+class: standard
+completed: 2026-10-20T17:02:10Z
+created: 2026-10-20T16:36:31Z
+id: 9
+priority: low
+started: 2026-10-20T17:02:10Z
+status: done
+tags:
+- release
+- changes
+title: Der Changes traegt keine Kopfzeile
+updated: 2026-10-20T17:02:10Z
+---
+
+Der Changes dieser Distribution traegt keine Kopfzeile.
+
+Die Hausform (Skill getty-git-commit-style) sieht so aus:
+
+    Revision history for <name>
+
+    {$NEXT}
+      - ...
+
+Vierzehn der achtzehn Distributionen der WWW-Flotte tragen die Kopfzeile, vier
+nicht. Diese Distribution gehoert zu den vier.
+
+Es wird genau eine Zeile ergaenzt: die Kopfzeile mit dem Namen aus dist.ini
+(WWW-Crawl4AI) und die Leerzeile darunter. Sonst nichts.
+
+Kein neuer Eintrag unter {$NEXT}: die Karte aendert die Form der Datei, nicht
+ihren Inhalt. Die Einrueckung der Eintraege (2 oder 4 Leerzeichen) bleibt
+unangetastet - sie ist je Datei verschieden und nicht Teil dieser Karte.
+
+Aenderungen ausserhalb von Changes: nicht.
+Commit-Betreff nennt die Karte als (kNN), kein #NN.
+
+2026-10-20 17:01 Changes: header 'Revision history for WWW-Crawl4AI' plus the blank line under it added at the top of the file. Diff against main: exactly 2 added lines, 0 removed, 1 file changed. No entry under {{$NEXT}} (the card changes the form of the file, not its content), indentation of the existing entries untouched. Suite offline: prove -lr t/ -> Files=17, Tests=135, all successful (3 live tests skipped, offline). Commit b5d92e7942198c1449cf0aabb3ad7a5f20a64eb7 on branch k09-crawl4ai, base main@5922b33.
+
+2026-10-20 17:01 Done: the Changes file carries the revision history header, commit b5d92e7 on branch k09-crawl4ai. Verified by the diff against main (2 added lines, 0 removed) and a green offline suite (17 files, 135 tests). Ready for the release manager to commit/merge.
+
+Koordination: der Commit b5d92e7 steht auf main (ff-only gemergt). Der Diff gegen main zeigt genau zwei zusaetzliche Zeilen ganz oben in der Changes-Datei (Kopfzeile 'Revision history for WWW-Crawl4AI' und die Leerzeile darunter), sonst nichts; kein Eintrag unter {{'$$NEXT'}}, die Einrueckung der Eintraege ist unveraendert. Suite offline: 17 Dateien, 135 Tests, PASS.
