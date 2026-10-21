@@ -2,6 +2,9 @@
 name: docs-drift-auditor
 description: Use after notable changes to lib/, before a release, or when skills, CONTEXT.md, or ADRs might contradict the code — audits agent-facing docs against the implementation and reports drift. Read-only; never fixes.
 disallowedTools: Edit, Write, NotebookEdit
+briefing:
+  skills:
+    - perl-www-crawl4ai
 color: purple
 ---
 
