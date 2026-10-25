@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-Repo-spezifische Hinweise für `WWW::Crawl4AI`. Die allgemeinen Perl-Regeln
-(Module-Loading, Moo/Moose, `@Author::GETTY` Dist::Zilla, cpanfile-Versionierung,
-Style) stehen im `getty-perl-core`-Skill (`.claude/skills/`) — die gelten hier
-weiterhin. Bei jeder Klassifikations- oder Chain-Frage ist der Code die
-Wahrheit, nicht die Doku: `lib/WWW/Crawl4AI/Detect.pm` und `Changes` zuerst.
+Repo-specific notes for `WWW::Crawl4AI`. The general Perl rules (module loading,
+Moo/Moose, `[@Author::GETTY]` Dist::Zilla, cpanfile versioning, style) live in the
+`getty-perl-core` skill (`.claude/skills/`) — they still apply here. For every
+classification or chain question the code is the truth, not the docs:
+`lib/WWW/Crawl4AI/Detect.pm` and `Changes` first.
 
 ## Delegation
 
@@ -13,24 +13,24 @@ lanes in `.claude/rules/crawl4ai-rules.md` (auto-loaded).
 
 | Task | Agent |
 |---|---|
-| Implementieren, Refactoren, Debuggen, Verhalten, Tests | `crawl4ai-worker` (Standard) |
-| Commits, `Changes`, Karte → done, Release-Audit vor jedem `dzil release` | `crawl4ai-release-manager` |
-| Eine URL live durch die Strategy Chain jagen, Attempt-Tabelle diagnostizieren | `crawl-chain-probe` |
-| Skills, CONTEXT.md und ADRs gegen `lib/` auf Drift prüfen | `docs-drift-auditor` |
-| Issues und PRDs auf dem karr-Board triagieren und labeln | `karr-triage` |
+| Implement, refactor, debug, behavior, tests | `crawl4ai-worker` (default) |
+| Commits, `Changes`, card → done, release audit before every `dzil release` | `crawl4ai-release-manager` |
+| Run a URL live through the strategy chain, diagnose the attempt table | `crawl-chain-probe` |
+| Check skills, CONTEXT.md and ADRs against `lib/` for drift | `docs-drift-auditor` |
+| Triage and label issues and PRDs on the karr board | `karr-triage` |
 
 ## Agent skills
 
 ### Issue tracker
 
-Issues und PRDs werden mit **karr** (git-natives Kanban, Board in `refs/karr/*`)
-verwaltet. See `docs/agents/issue-tracker.md`.
+Issues and PRDs are managed with **karr** (git-native kanban, board in `refs/karr/*`).
+See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Die fünf kanonischen Triage-Rollen sind als karr-Tags mit ihren Standardnamen
-abgebildet. See `docs/agents/triage-labels.md`.
+The five canonical triage roles map to karr tags with their default names. See
+`docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: ein `CONTEXT.md` + `docs/adr/` im Repo-Root. See `docs/agents/domain.md`.
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
