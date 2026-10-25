@@ -1,5 +1,7 @@
 Revision history for WWW-Crawl4AI
 
+{{$NEXT}}
+
 0.007     2026-10-25 00:49:59Z
 
  - do_request now raises a type=transport error (status_code 0) also for the
