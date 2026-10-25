@@ -8,7 +8,8 @@ Wahrheit, nicht die Doku: `lib/WWW/Crawl4AI/Detect.pm` und `Changes` zuerst.
 
 ## Delegation
 
-Delegation und Hausregeln: `.claude/rules/crawl4ai-rules.md` (automatisch geladen).
+Delegation and house rules: shared rules via the skilletor bundle `getty-cpan-dist@getty`;
+lanes in `.claude/rules/crawl4ai-rules.md` (auto-loaded).
 
 | Task | Agent |
 |---|---|
