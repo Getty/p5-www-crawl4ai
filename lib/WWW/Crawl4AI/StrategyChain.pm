@@ -8,7 +8,7 @@ use WWW::Crawl4AI::Strategy::CloakBrowser ();
 use WWW::Crawl4AI::Strategy::Proxy ();
 use WWW::Crawl4AI::Strategy::Callback ();
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 SYNOPSIS
 

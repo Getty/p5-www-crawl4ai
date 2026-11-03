@@ -3,7 +3,7 @@ package WWW::Crawl4AI::Strategy;
 use Moo::Role;
 use WWW::Crawl4AI::Request ();
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 SYNOPSIS
 

@@ -3,7 +3,7 @@ package WWW::Crawl4AI::Request;
 use Moo;
 use Carp qw( croak );
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 SYNOPSIS
 

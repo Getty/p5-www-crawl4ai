@@ -4,7 +4,7 @@ use Moo;
 use JSON::MaybeXS ();
 use URI ();
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 SYNOPSIS
 

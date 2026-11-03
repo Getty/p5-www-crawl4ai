@@ -6,7 +6,7 @@ use overload
   bool => sub { 1 },
   fallback => 1;
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 SYNOPSIS
 

@@ -4,7 +4,7 @@ use Moo;
 with 'WWW::Crawl4AI::Strategy';
 use WWW::Crawl4AI::Markdown qw( resolve_markdown_chain );
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 DESCRIPTION
 

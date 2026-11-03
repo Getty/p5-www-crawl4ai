@@ -2,7 +2,7 @@ package WWW::Crawl4AI::Attempt;
 # ABSTRACT: one strategy attempt in a WWW::Crawl4AI fallback chain
 use Moo;
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 SYNOPSIS
 

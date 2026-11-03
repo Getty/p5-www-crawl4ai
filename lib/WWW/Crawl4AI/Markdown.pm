@@ -3,7 +3,7 @@ package WWW::Crawl4AI::Markdown;
 use strict;
 use warnings;
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 SYNOPSIS
 

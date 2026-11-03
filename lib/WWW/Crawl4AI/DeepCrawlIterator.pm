@@ -2,7 +2,7 @@ package WWW::Crawl4AI::DeepCrawlIterator;
 # ABSTRACT: breadth-first iterator for deep_crawl, separating frontier management from crawl logic
 use Moo;
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 SYNOPSIS
 

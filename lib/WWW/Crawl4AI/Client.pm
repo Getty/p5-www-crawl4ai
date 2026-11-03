@@ -13,7 +13,7 @@ use WWW::Crawl4AI::Markdown qw( resolve_markdown_chain );
 use WWW::Crawl4AI::Request ();
 use WWW::Crawl4AI::Error ();
 
-our $VERSION = '0.001';
+our $VERSION = '0.008';
 
 =head1 SYNOPSIS
 
